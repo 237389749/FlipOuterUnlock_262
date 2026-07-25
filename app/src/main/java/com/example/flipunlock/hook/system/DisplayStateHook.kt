@@ -43,8 +43,7 @@ object DisplayStateHook {
             hookDisplayEnabledLocked(param)
             hookExternalDisplayDisable(param)
             hookDisplayInfoCutoutZero(param)
-            hookLayoutCutoutMode(param)
-            hookGravityDiagnostic(param)
+            hookComputeFrames(param)
             hookAodOuterScreen(param)
         }
     }
@@ -69,41 +68,50 @@ object DisplayStateHook {
         }.onFailure { log("DisplayState: getLayoutInDisplayCutoutMode failed", it) }
     }
 
-    // ── Diagnostic: trace toast/hint positioning ────────────────────────
+    // ── Fix toast/hint left-shift at the frame level ───────────────────
     //
-    // Gravity.apply(int, int, int, Rect, int, int, Rect) is called from
-    // WindowLayout.computeFrames() for every window. Log the parent frame
-    // (container) dimensions for BOTTOM|CENTER_HORIZONTAL windows (toasts).
-    // This tells us definitively whether the parent frame has been narrowed
-    // by cutout safe insets.
+    // WindowLayout.computeFrames() is THE final choke point for all window
+    // frame computation in system_server. After the method runs, if the
+    // parentFrame or displayFrame right edge was narrowed by cutout-safe
+    // clipping (intersectOrClamp at line 156), expand it back to the full
+    // display width from windowBounds.
+    //
+    // This is independent of getLayoutInDisplayCutoutMode — if that hook
+    // failed (MIUI stub class mismatch), this one still fixes the output.
 
-    private fun hookGravityDiagnostic(param: SystemServerStartingParam) {
+    private fun hookComputeFrames(param: SystemServerStartingParam) {
         runCatching {
-            val gravityClass = param.classLoader.loadClass("android.view.Gravity")
-            var once = false
-            // Gravity.apply(gravity: Int, w: Int, h: Int, container: Rect, xAdj: Int, yAdj: Int, outRect: Rect)
-            val method = gravityClass.getDeclaredMethod("apply",
-                Int::class.javaPrimitiveType!!,
-                Int::class.javaPrimitiveType!!,
-                Int::class.javaPrimitiveType!!,
-                android.graphics.Rect::class.java,
-                Int::class.javaPrimitiveType!!,
-                Int::class.javaPrimitiveType!!,
-                android.graphics.Rect::class.java)
+            val wlClass = param.classLoader.loadClass("android.view.WindowLayout")
+            val method = wlClass.declaredMethods.firstOrNull {
+                it.name == "computeFrames" && it.parameterCount == 10
+            } ?: return@runCatching
             method.isAccessible = true
+
             hook(method) { chain ->
-                val gravity = chain.args[0] as? Int ?: 0
-                // 0x51 = BOTTOM|CENTER_HORIZONTAL — standard toast gravity
-                // 0x50 = BOTTOM — also common for hints
-                if (!once && (gravity == 0x51 || gravity == 0x50)) {
-                    once = true
-                    val container = chain.args[3] as? android.graphics.Rect
-                    log("DIAG: Gravity.apply gravity=0x${gravity.toString(16)} container=$container")
+                // Capture full display width from windowBounds BEFORE compute
+                val windowBounds = chain.args[3] as? android.graphics.Rect
+                val fullRight = windowBounds?.right ?: 0
+                val result = chain.proceed()
+
+                if (fullRight <= 0) return@hook result
+
+                // Fix output frames AFTER compute: expand right edge to full width
+                val frames = chain.args[9]  // ClientWindowFrames
+                if (frames != null) {
+                    val pf = frames.getField("parentFrame") as? android.graphics.Rect
+                    val df = frames.getField("displayFrame") as? android.graphics.Rect
+                    if (pf != null && pf.right in 1 until fullRight) {
+                        log("DIAG: computeFrames parentFrame right ${pf.right} → $fullRight")
+                        pf.right = fullRight
+                    }
+                    if (df != null && df.right in 1 until fullRight) {
+                        df.right = fullRight
+                    }
                 }
-                chain.proceed()
+                result
             }
-            log("DisplayState: ✓ Gravity diagnostic installed")
-        }.onFailure { log("DisplayState: Gravity diagnostic failed", it) }
+            log("DisplayState: ✓ computeFrames hooked (toast fix)")
+        }.onFailure { log("DisplayState: computeFrames failed", it) }
     }
 
     // ── 1. Display layer: always CLOSED → outer screen active ───────────
