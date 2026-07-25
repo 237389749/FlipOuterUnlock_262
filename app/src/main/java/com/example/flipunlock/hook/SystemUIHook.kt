@@ -28,11 +28,34 @@ object SystemUIHook : BaseHook() {
 
     override fun setupHooks(param: PackageReadyParam) {
         log("SystemUIHook: loading for ${param.packageName}")
+        hookHideDisplayCutoutOrganizer(param)
         hookDecorWindowManager(param)
         hookNotificationMenu(param)
         hookStatusBarClock(param)
         hookStatusBarIcons(param)
         hookNavigationBar(param)
+    }
+
+    // ── HideDisplayCutoutOrganizer: block Shell-level cutout crop ──────
+    //
+    // This DisplayAreaOrganizer reads Display.getCutout().getSafeInsets()
+    // and applies setWindowCrop() on the entire display area Surface,
+    // cropping content to displayWidth - safeInsetRight. This is a SEPARATE
+    // layer from system_server's WindowLayout — even if window frames are
+    // correct, the Shell crops them at the Surface level.
+    //
+    // Hook getDisplayCutoutInsetsOfNaturalOrientation() → Insets.NONE to
+    // prevent the crop. Must hook BEFORE updateBoundsAndOffsets() runs.
+
+    private fun hookHideDisplayCutoutOrganizer(param: PackageReadyParam) {
+        runCatching {
+            val cls = param.classLoader.loadClass(
+                "com.android.wm.shell.hidedisplaycutout.HideDisplayCutoutOrganizer")
+            val method = cls.getDeclaredMethod("getDisplayCutoutInsetsOfNaturalOrientation")
+            method.isAccessible = true
+            hook(method, replaceResult(android.graphics.Insets.NONE))
+            log("SystemUI: HideDisplayCutoutOrganizer → Insets.NONE")
+        }.onFailure { log("SystemUI: HideDisplayCutoutOrganizer failed", it) }
     }
 
     // ── DecorWindowManagerImpl.shouldHideDecorWindow ────────────────────
