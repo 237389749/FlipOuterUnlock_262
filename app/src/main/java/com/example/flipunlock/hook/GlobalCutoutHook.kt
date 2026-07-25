@@ -25,12 +25,36 @@ object GlobalCutoutHook : BaseHook() {
         // same reason. Keyboard width regression traced to b668164 (Build #220).
         if (pkg == "com.sohu.inputmethod.sogou.xiaomi") return
         safeHook("GlobalCutout") {
+            hookLayoutCutoutMode(param)
             hookDisplayGetCutout(pkg)
             hookWindowInsetsGetCutout(pkg)
             hookFlipFoldedCutoutStub(param)
             hookSizeCompatScaleMode(param)
             hookDisplayMetricsDiag(param)
         }
+    }
+
+    // ── Force ALWAYS layoutInDisplayCutoutMode for ALL windows ─────────
+    //
+    // WindowLayoutStubImpl.getLayoutInDisplayCutoutMode() controls whether
+    // WindowLayout.computeFrames() clips the parent frame by cutout-safe
+    // area. Toast windows have mode=0 (DEFAULT) and no FLAG_LAYOUT_IN_SCREEN,
+    // so line 49 returns the original mode → clipping applies → left-shift.
+    //
+    // This is independent of DeviceIdentityHook — even with isFlipFolded
+    // spoofed, line 43 only overrides mode==1 (SHORT_EDGES), not mode==0
+    // (DEFAULT). Force ALWAYS for all windows to prevent cutout clipping.
+
+    private fun hookLayoutCutoutMode(param: PackageReadyParam) {
+        runCatching {
+            val cls = param.classLoader.loadClass(
+                "android.view.WindowLayoutStubImpl")
+            val method = cls.getDeclaredMethod("getLayoutInDisplayCutoutMode",
+                android.view.WindowManager.LayoutParams::class.java)
+            method.isAccessible = true
+            hook(method, replaceResult(3))  // LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            log("GlobalCutout: getLayoutInDisplayCutoutMode → ALWAYS for ${param.packageName}")
+        }.onFailure { log("GlobalCutout: getLayoutInDisplayCutoutMode failed", it) }
     }
 
     /**
