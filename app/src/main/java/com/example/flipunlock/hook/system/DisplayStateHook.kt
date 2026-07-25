@@ -43,9 +43,30 @@ object DisplayStateHook {
             hookDisplayEnabledLocked(param)
             hookExternalDisplayDisable(param)
             hookDisplayInfoCutoutZero(param)
+            hookLayoutCutoutMode(param)
             hookGravityDiagnostic(param)
             hookAodOuterScreen(param)
         }
+    }
+
+    // ── Force ALWAYS cutout mode in system_server ──────────────────────
+    //
+    // WindowLayout.computeFrames() RUNS IN SYSTEM_SERVER (called from
+    // DisplayPolicy.layoutWindowLw()). It calls getLayoutInDisplayCutoutMode()
+    // on WindowLayoutStubImpl to decide whether to clip frames by cutout-safe
+    // area. The GlobalCutoutHook version only runs in APP PROCESSES — useless
+    // for actual window frame computation. This hook runs in the right place.
+
+    private fun hookLayoutCutoutMode(param: SystemServerStartingParam) {
+        runCatching {
+            val cls = param.classLoader.loadClass(
+                "android.view.WindowLayoutStubImpl")
+            val method = cls.getDeclaredMethod("getLayoutInDisplayCutoutMode",
+                android.view.WindowManager.LayoutParams::class.java)
+            method.isAccessible = true
+            hook(method, replaceResult(3))  // LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            log("DisplayState: getLayoutInDisplayCutoutMode → ALWAYS (system_server)")
+        }.onFailure { log("DisplayState: getLayoutInDisplayCutoutMode failed", it) }
     }
 
     // ── Diagnostic: trace toast/hint positioning ────────────────────────
