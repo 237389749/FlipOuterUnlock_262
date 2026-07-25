@@ -252,20 +252,39 @@ object DisplayStateHook {
 
     private fun hookDisplayInfoCutoutZero(param: SystemServerStartingParam) {
         runCatching {
-            val logicalDisplayClass = param.classLoader.loadClass(
-                "com.android.server.display.LogicalDisplay")
             val displayCutoutClass = param.classLoader.loadClass(
                 "android.view.DisplayCutout")
             val noCutout = displayCutoutClass.field("NO_CUTOUT").get(null)
                 ?: return@runCatching
 
-            hook(logicalDisplayClass.method("getDisplayInfoLocked"),
-                after { _, result ->
-                    val info = result ?: return@after result
-                    info.setField("displayCutout", noCutout)
-                    result
-                })
-            log("DisplayState: ✓ DisplayInfo.displayCutout → NO_CUTOUT")
+            // Path A: LogicalDisplay.getDisplayInfoLocked() — constructs
+            // DisplayInfo from base+override, used by DisplayManagerService.
+            runCatching {
+                val logicalDisplayClass = param.classLoader.loadClass(
+                    "com.android.server.display.LogicalDisplay")
+                hook(logicalDisplayClass.method("getDisplayInfoLocked"),
+                    after { _, result ->
+                        val info = result ?: return@after result
+                        info.setField("displayCutout", noCutout)
+                        result
+                    })
+            }
+
+            // Path B: DisplayContent.getDisplayInfo() — returns mDisplayInfo
+            // directly. This is what getCompatGravity (dc.mDisplayInfo.displayCutout)
+            // and fillInsetsState read from. Separate object from Path A.
+            runCatching {
+                val dcClass = param.classLoader.loadClass(
+                    "com.android.server.wm.DisplayContent")
+                hook(dcClass.method("getDisplayInfo"),
+                    after { _, result ->
+                        val info = result ?: return@after result
+                        info.setField("displayCutout", noCutout)
+                        result
+                    })
+            }
+
+            log("DisplayState: ✓ DisplayInfo.displayCutout → NO_CUTOUT (both paths)")
         }.onFailure { log("DisplayState: displayCutout zero failed", it) }
     }
 
