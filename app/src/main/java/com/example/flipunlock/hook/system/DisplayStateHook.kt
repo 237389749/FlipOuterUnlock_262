@@ -82,10 +82,16 @@ object DisplayStateHook {
     private fun hookComputeFrames(param: SystemServerStartingParam) {
         runCatching {
             val wlClass = param.classLoader.loadClass("android.view.WindowLayout")
-            val method = wlClass.declaredMethods.firstOrNull {
-                it.name == "computeFrames" && it.parameterCount == 10
-            } ?: return@runCatching
+            // Find by name only — parameter count may vary across HyperOS versions
+            val methods = wlClass.declaredMethods.filter { it.name == "computeFrames" }
+            log("DisplayState: computeFrames candidates: ${methods.map { it.parameterCount }}")
+            val method = methods.maxByOrNull { it.parameterCount }
+            if (method == null) {
+                log("DisplayState: computeFrames NOT FOUND — giving up")
+                return@runCatching
+            }
             method.isAccessible = true
+            log("DisplayState: computeFrames HOOKED (${method.parameterCount} params)")
 
             hook(method) { chain ->
                 // Capture full display width from windowBounds BEFORE compute
@@ -96,7 +102,7 @@ object DisplayStateHook {
                 if (fullRight <= 0) return@hook result
 
                 // Fix output frames AFTER compute: expand right edge to full width
-                val frames = chain.args[9]  // ClientWindowFrames
+                val frames = chain.args[chain.args.size - 1]  // last arg = ClientWindowFrames
                 if (frames != null) {
                     val pf = frames.getField("parentFrame") as? android.graphics.Rect
                     val df = frames.getField("displayFrame") as? android.graphics.Rect
@@ -110,8 +116,7 @@ object DisplayStateHook {
                 }
                 result
             }
-            log("DisplayState: ✓ computeFrames hooked (toast fix)")
-        }.onFailure { log("DisplayState: computeFrames failed", it) }
+        }.onFailure { log("DisplayState: computeFrames FAILED", it) }
     }
 
     // ── 1. Display layer: always CLOSED → outer screen active ───────────
