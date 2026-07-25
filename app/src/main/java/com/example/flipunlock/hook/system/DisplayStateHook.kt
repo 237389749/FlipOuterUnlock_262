@@ -257,34 +257,25 @@ object DisplayStateHook {
             val noCutout = displayCutoutClass.field("NO_CUTOUT").get(null)
                 ?: return@runCatching
 
-            // Path A: LogicalDisplay.getDisplayInfoLocked() — constructs
-            // DisplayInfo from base+override, used by DisplayManagerService.
-            runCatching {
-                val logicalDisplayClass = param.classLoader.loadClass(
-                    "com.android.server.display.LogicalDisplay")
-                hook(logicalDisplayClass.method("getDisplayInfoLocked"),
-                    after { _, result ->
-                        val info = result ?: return@after result
-                        info.setField("displayCutout", noCutout)
-                        result
-                    })
-            }
-
-            // Path B: DisplayContent.getDisplayInfo() — returns mDisplayInfo
-            // directly. This is what getCompatGravity (dc.mDisplayInfo.displayCutout)
-            // and fillInsetsState read from. Separate object from Path A.
+            // Hook calculateDisplayCutoutForRotation(int) — THE single choke
+            // point where DisplayContent computes the cutout. Returning
+            // NO_CUTOUT here makes line 1706 set mDisplayInfo.displayCutout
+            // to null. All downstream field reads (getCompatGravity,
+            // fillInsetsState, etc.) then see null cutout.
+            //
+            // Previous approach (hooking getters) didn't work because MIUI
+            // code accesses dc.mDisplayInfo.displayCutout as a FIELD, not
+            // through getDisplayInfo().
             runCatching {
                 val dcClass = param.classLoader.loadClass(
                     "com.android.server.wm.DisplayContent")
-                hook(dcClass.method("getDisplayInfo"),
-                    after { _, result ->
-                        val info = result ?: return@after result
-                        info.setField("displayCutout", noCutout)
-                        result
-                    })
-            }
-
-            log("DisplayState: ✓ DisplayInfo.displayCutout → NO_CUTOUT (both paths)")
+                val method = dcClass.getDeclaredMethod(
+                    "calculateDisplayCutoutForRotation",
+                    Int::class.javaPrimitiveType!!)
+                method.isAccessible = true
+                hook(method, replaceResult(noCutout))
+                log("DisplayState: calculateDisplayCutoutForRotation → NO_CUTOUT")
+            }.onFailure { log("DisplayState: calculateDisplayCutoutForRotation failed", it) }
         }.onFailure { log("DisplayState: displayCutout zero failed", it) }
     }
 
