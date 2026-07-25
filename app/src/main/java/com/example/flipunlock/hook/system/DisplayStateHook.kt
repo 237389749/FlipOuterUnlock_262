@@ -43,8 +43,46 @@ object DisplayStateHook {
             hookDisplayEnabledLocked(param)
             hookExternalDisplayDisable(param)
             hookDisplayInfoCutoutZero(param)
+            hookGravityDiagnostic(param)
             hookAodOuterScreen(param)
         }
+    }
+
+    // ── Diagnostic: trace toast/hint positioning ────────────────────────
+    //
+    // Gravity.apply(int, int, int, Rect, int, int, Rect) is called from
+    // WindowLayout.computeFrames() for every window. Log the parent frame
+    // (container) dimensions for BOTTOM|CENTER_HORIZONTAL windows (toasts).
+    // This tells us definitively whether the parent frame has been narrowed
+    // by cutout safe insets.
+
+    private fun hookGravityDiagnostic(param: SystemServerStartingParam) {
+        runCatching {
+            val gravityClass = param.classLoader.loadClass("android.view.Gravity")
+            var once = false
+            // Gravity.apply(gravity: Int, w: Int, h: Int, container: Rect, xAdj: Int, yAdj: Int, outRect: Rect)
+            val method = gravityClass.getDeclaredMethod("apply",
+                Int::class.javaPrimitiveType!!,
+                Int::class.javaPrimitiveType!!,
+                Int::class.javaPrimitiveType!!,
+                android.graphics.Rect::class.java,
+                Int::class.javaPrimitiveType!!,
+                Int::class.javaPrimitiveType!!,
+                android.graphics.Rect::class.java)
+            method.isAccessible = true
+            hook(method) { chain ->
+                val gravity = chain.args[0] as? Int ?: 0
+                // 0x51 = BOTTOM|CENTER_HORIZONTAL — standard toast gravity
+                // 0x50 = BOTTOM — also common for hints
+                if (!once && (gravity == 0x51 || gravity == 0x50)) {
+                    once = true
+                    val container = chain.args[3] as? android.graphics.Rect
+                    log("DIAG: Gravity.apply gravity=0x${gravity.toString(16)} container=$container")
+                }
+                chain.proceed()
+            }
+            log("DisplayState: ✓ Gravity diagnostic installed")
+        }.onFailure { log("DisplayState: Gravity diagnostic failed", it) }
     }
 
     // ── 1. Display layer: always CLOSED → outer screen active ───────────
@@ -286,7 +324,12 @@ object DisplayStateHook {
                 method.isAccessible = true
                 hook(method, after { chain, _ ->
                     val outBounds = chain.args[0] as? android.graphics.Rect
+                    val beforeRight = outBounds?.right
                     outBounds?.set(-100000, -100000, 100000, 100000)
+                    // One-shot: log original vs fixed bounds to confirm hook is working
+                    if (beforeRight != null && beforeRight != 100000) {
+                        log("DIAG: getDisplayCutoutSafe right $beforeRight → 100000 (full)")
+                    }
                     null
                 })
                 log("DisplayState: InsetsState.getDisplayCutoutSafe → full bounds")

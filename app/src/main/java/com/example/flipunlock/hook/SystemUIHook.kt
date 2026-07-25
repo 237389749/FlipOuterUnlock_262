@@ -53,9 +53,16 @@ object SystemUIHook : BaseHook() {
                 "com.android.wm.shell.hidedisplaycutout.HideDisplayCutoutOrganizer")
             val method = cls.getDeclaredMethod("getDisplayCutoutInsetsOfNaturalOrientation")
             method.isAccessible = true
-            hook(method, replaceResult(android.graphics.Insets.NONE))
-            log("SystemUI: HideDisplayCutoutOrganizer → Insets.NONE")
-        }.onFailure { log("SystemUI: HideDisplayCutoutOrganizer failed", it) }
+            hook(method) { chain ->
+                val result = chain.proceed()
+                // One-shot: log what the original method returned vs our override
+                if (result != android.graphics.Insets.NONE) {
+                    log("DIAG: HideDisplayCutoutOrganizer original insets=$result → overriding to NONE")
+                }
+                android.graphics.Insets.NONE
+            }
+            log("DIAG: HideDisplayCutoutOrganizer HOOKED ✓")
+        }.onFailure { log("DIAG: HideDisplayCutoutOrganizer FAILED: ${it.message}") }
     }
 
     // ── DecorWindowManagerImpl.shouldHideDecorWindow ────────────────────
