@@ -257,15 +257,8 @@ object DisplayStateHook {
             val noCutout = displayCutoutClass.field("NO_CUTOUT").get(null)
                 ?: return@runCatching
 
-            // Hook calculateDisplayCutoutForRotation(int) — THE single choke
-            // point where DisplayContent computes the cutout. Returning
-            // NO_CUTOUT here makes line 1706 set mDisplayInfo.displayCutout
-            // to null. All downstream field reads (getCompatGravity,
-            // fillInsetsState, etc.) then see null cutout.
-            //
-            // Previous approach (hooking getters) didn't work because MIUI
-            // code accesses dc.mDisplayInfo.displayCutout as a FIELD, not
-            // through getDisplayInfo().
+            // Hook calculateDisplayCutoutForRotation(int) — prevents new
+            // cutout from being computed during rotation events.
             runCatching {
                 val dcClass = param.classLoader.loadClass(
                     "com.android.server.wm.DisplayContent")
@@ -276,6 +269,28 @@ object DisplayStateHook {
                 hook(method, replaceResult(noCutout))
                 log("DisplayState: calculateDisplayCutoutForRotation → NO_CUTOUT")
             }.onFailure { log("DisplayState: calculateDisplayCutoutForRotation failed", it) }
+
+            // Hook InsetsState.getDisplayCutoutSafe(Rect) → always return
+            // full display bounds. This is THE definitive fix for toast/hint
+            // left-shift. WindowLayout.computeFrames() reads the cutout-safe
+            // area from the global InsetsState (set during DisplayFrames
+            // construction, BEFORE our hooks). By always returning unclipped
+            // bounds, intersectOrClamp() never narrows the parent frame,
+            // and Gravity.apply(CENTER_HORIZONTAL) centers correctly.
+            runCatching {
+                val insetsStateClass = param.classLoader.loadClass(
+                    "android.view.InsetsState")
+                val method = insetsStateClass.getDeclaredMethod(
+                    "getDisplayCutoutSafe",
+                    android.graphics.Rect::class.java)
+                method.isAccessible = true
+                hook(method, after { chain, _ ->
+                    val outBounds = chain.args[0] as? android.graphics.Rect
+                    outBounds?.set(-100000, -100000, 100000, 100000)
+                    null
+                })
+                log("DisplayState: InsetsState.getDisplayCutoutSafe → full bounds")
+            }.onFailure { log("DisplayState: getDisplayCutoutSafe failed", it) }
         }.onFailure { log("DisplayState: displayCutout zero failed", it) }
     }
 
