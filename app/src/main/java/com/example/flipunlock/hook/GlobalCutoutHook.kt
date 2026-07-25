@@ -112,9 +112,8 @@ object GlobalCutoutHook : BaseHook() {
     private fun hookDisplayGetCutout(pkg: String) {
         runCatching {
             val method = Display::class.java.method("getCutout")
-            val zero = getZeroCutout() ?: return
+            val zero = noCutout() ?: return
             hook(method) { zero }
-            log("GlobalCutout: Display.getCutout → NO_CUTOUT for $pkg")
         }.onFailure { log("GlobalCutout: Display.getCutout failed", it) }
     }
 
@@ -123,29 +122,22 @@ object GlobalCutoutHook : BaseHook() {
             val method = android.view.WindowInsets::class.java.getDeclaredMethod("getDisplayCutout")
             method.isAccessible = true
             hook(method, replaceResult(null))
-            log("GlobalCutout: WindowInsets.getDisplayCutout → null for $pkg")
         }.onFailure { log("GlobalCutout: WindowInsets.getDisplayCutout failed", it) }
     }
 
-    private fun getZeroCutout(): DisplayCutout? {
+    // Cache NO_CUTOUT from static field — more reliable than constructor reflection
+    @Volatile private var noCutoutCache: DisplayCutout? = null
+
+    private fun noCutout(): DisplayCutout? {
+        noCutoutCache?.let { return it }
         runCatching {
             val dcClass = DisplayCutout::class.java
-            val constructor = dcClass.declaredConstructors.minByOrNull { it.parameterCount }
-                ?: return null
-            constructor.isAccessible = true
-            val args = constructor.parameterTypes.map { type ->
-                when (type) {
-                    android.graphics.Insets::class.java -> android.graphics.Insets.of(0, 0, 0, 0)
-                    android.graphics.Rect::class.java -> android.graphics.Rect(0, 0, 0, 0)
-                    android.graphics.Path::class.java -> android.graphics.Path()
-                    Int::class.javaPrimitiveType, Integer::class.java -> 0
-                    Boolean::class.javaPrimitiveType, java.lang.Boolean::class.java -> false
-                    java.util.List::class.java -> java.util.Collections.emptyList<Any>()
-                    else -> null
-                }
-            }.toTypedArray()
-            return constructor.newInstance(*args) as DisplayCutout
-        }.onFailure { log("GlobalCutout: construct zero cutout failed", it) }
+            val field = dcClass.getDeclaredField("NO_CUTOUT")
+            field.isAccessible = true
+            val nc = field.get(null) as? DisplayCutout
+            if (nc != null) noCutoutCache = nc
+            return nc
+        }.onFailure { log("GlobalCutout: NO_CUTOUT field access failed", it) }
         return null
     }
 }
