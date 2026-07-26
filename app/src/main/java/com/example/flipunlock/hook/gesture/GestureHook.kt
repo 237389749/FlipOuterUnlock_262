@@ -33,7 +33,7 @@ object GestureHook : BaseHook() {
         log("GestureFix: setupHooks")
         hookNoStartPage(param)
 //        disableFlipLauncher(param)  // DISABLED: fliphome is now the active launcher
-        hookSideGesturePersistence(param)
+//        hookSideGesturePersistence(param)  // DISABLED: fliphome handles gestures natively when it's the active launcher
     }
 
     // ── 1. No start page (ported from MixFlipMod) ────────────────────────
@@ -47,7 +47,11 @@ object GestureHook : BaseHook() {
         }.onFailure { log("GestureFix: PerformLaunchAction not found", it) }
     }
 
-    // ── 2. Prevent fold state changes from destroying side gesture stubs ──
+    // ── 2. [DISABLED] Side gesture persistence ───────────────────────────
+    // WAS: protect fliphome gestures from fold-state false signals during
+    // miuihome-takeover era. Now fliphome is the active launcher and handles
+    // gesture lifecycle natively via BaseGestureImpl enableGestureInput()/
+    // clearBackStubWindow() based on actual fold state.
     //
     // BaseGestureImpl.onDisplayFoldChanged(false) triggers:
     //   clearBackStubWindow() → GestureStubView.clearGestureStub()
