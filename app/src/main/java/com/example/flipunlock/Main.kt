@@ -16,7 +16,7 @@ import com.example.flipunlock.hook.RecentsMenuHook
 import com.example.flipunlock.hook.ScreenTypeHook
 import com.example.flipunlock.hook.SystemUIHook
 import com.example.flipunlock.hook.gesture.GestureHook
-import com.example.flipunlock.hook.LauncherHook
+//import com.example.flipunlock.hook.LauncherHook  // DISABLED: miuihome gestures unreliable
 import com.example.flipunlock.hook.LockScreenHook
 import com.example.flipunlock.hook.system.AppBoundsHook
 import com.example.flipunlock.hook.system.CompatConfigHook

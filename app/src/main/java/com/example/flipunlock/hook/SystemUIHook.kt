@@ -33,7 +33,7 @@ object SystemUIHook : BaseHook() {
         hookNotificationMenu(param)
         hookStatusBarClock(param)
         hookStatusBarIcons(param)
-        hookNavigationBar(param)
+//        hookNavigationBar(param)  // DISABLED: miuihome NavStubView no longer used
     }
 
     // ── HideDisplayCutoutOrganizer: block Shell-level cutout crop ──────
