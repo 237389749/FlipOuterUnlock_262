@@ -86,12 +86,12 @@ object GestureHook : BaseHook() {
                 }
             }
 
-            // Force mIsFolded=true on every onDisplayFoldChanged call
+            // Force mIsFolded=true on every relevant callback
             runCatching {
                 val foldedField = cls.getDeclaredField("mIsFolded")
                 foldedField.isAccessible = true
-                // Hook methods that read mIsFolded: updateFsgWindowStateForHome, enableGestureInput, onResumed
-                // The simplest: hook onResumed to force mIsFolded=true first
+
+                // Hook onResumed: force mIsFolded=true before enableGestureInput() check
                 val onResumedMethod = cls.getDeclaredMethod("onResumed",
                     android.content.ComponentName::class.java)
                 onResumedMethod.isAccessible = true
@@ -99,9 +99,31 @@ object GestureHook : BaseHook() {
                     val obj = chain.thisObject
                     runCatching { foldedField.setBoolean(obj, true) }
                 })
-                // Also hook the fold change path: find and hook the display fold listener
-                // The BroadcastManager sends onDisplayFoldChanged via AbstractSystemEventPresenter
-                // We hook hideBackStubWindow as defense-in-depth
+
+                // Hook AbstractSystemEventPresenter.onDisplayFoldChanged:
+                // spurious unfold signal → mIsFolded=false → gestures dead.
+                // Restore mIsFolded=true AFTER the original runs.
+                runCatching {
+                    val presenterClass = param.classLoader.loadClass(
+                        "com.miui.fliphome.presenter.AbstractSystemEventPresenter")
+                    val foldMethod = presenterClass.getDeclaredMethod(
+                        "onDisplayFoldChanged", Boolean::class.javaPrimitiveType!!)
+                    foldMethod.isAccessible = true
+                    hook(foldMethod, after { chain, _ ->
+                        val isFolded = chain.args[0] as? Boolean
+                        if (isFolded == false) {
+                            // Anonymous class BaseGestureImpl$1 → this$0 = outer BaseGestureImpl
+                            val this0 = chain.thisObject?.getField("this\$0")
+                            if (this0 != null) {
+                                runCatching { foldedField.setBoolean(this0, true) }
+                                log("GestureFix: restored mIsFolded=true after onDisplayFoldChanged(false)")
+                            }
+                        }
+                        null
+                    })
+                }
+
+                // Defense-in-depth: also block hideBackStubWindow
                 runCatching {
                     val hideMethod = cls.getDeclaredMethod("hideBackStubWindow")
                     hideMethod.isAccessible = true
