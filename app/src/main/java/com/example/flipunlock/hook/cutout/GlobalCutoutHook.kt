@@ -1,4 +1,4 @@
-package com.example.flipunlock.hook
+package com.example.flipunlock.hook.cutout
 
 import android.view.Display
 import android.view.DisplayCutout
@@ -19,11 +19,8 @@ object GlobalCutoutHook : BaseHook() {
 
     override fun hook(param: PackageReadyParam) {
         if (!Config.displayCutout) return
-        val pkg = param.packageName
-        // Sogou IME needs real cutout info for keyboard sizing on outer screen.
-        // Skip ALL hooks — DeviceIdentityHook already excludes Sogou for the
-        // same reason. Keyboard width regression traced to b668164 (Build #220).
-        if (pkg == "com.sohu.inputmethod.sogou.xiaomi") return
+        // Packages that need real cutout for layout — centralized in Config.cutoutExcludedPackages.
+        if (param.packageName in Config.cutoutExcludedPackages) return
         safeHook("GlobalCutout") {
             hookLayoutCutoutMode(param)
             hookDisplayGetCutout(pkg)
@@ -59,11 +56,9 @@ object GlobalCutoutHook : BaseHook() {
 
     /**
      * DisplayCutoutStubImpl.isFlipFolded() → false.
-     *
-     * Skip Sogou IME — keyboard needs real fold state for layout.
+     * Exclusion handled at hook() entry via Config.cutoutExcludedPackages.
      */
     private fun hookFlipFoldedCutoutStub(param: PackageReadyParam) {
-        if (param.packageName == "com.sohu.inputmethod.sogou.xiaomi") return
         runCatching {
             val cls = param.classLoader.loadClass("android.view.DisplayCutoutStubImpl")
             val method = cls.getDeclaredMethod("isFlipFolded")
@@ -74,23 +69,10 @@ object GlobalCutoutHook : BaseHook() {
     }
 
     /**
-     * ActivityThreadStub.inMiuiSizeCompatScaleMode() → false.
-     *
-     * SystemServicesHook forces getFlipCompatMode→0 (fullscreen) at the
-     * system_server level. But the app process still runs MIUI size-compat
-     * logic via inMiuiSizeCompatScaleMode(). When true:
-     *   - applyViewLocation() shifts views by -bounds.left
-     *   - processMotionEvent() adjusts touch coordinates
-     *   - updateSizeCompatBounds() modifies layout bounds
-     *
-     * By forcing false, we prevent the flip-specific view shifting that
-     * causes popups/toasts to appear off-center (shifted left).
-     *
-     * Skip Sogou IME — keyboard needs real size-compat scaling to fill
-     * the outer screen width correctly.
+     * ActivityThreadImpl.inMiuiSizeCompatScaleMode() → false.
+     * Exclusion handled at hook() entry via Config.cutoutExcludedPackages.
      */
     private fun hookSizeCompatScaleMode(param: PackageReadyParam) {
-        if (param.packageName == "com.sohu.inputmethod.sogou.xiaomi") return
         runCatching {
             val cls = param.classLoader.loadClass("android.app.ActivityThreadImpl")
             val method = cls.getDeclaredMethod("inMiuiSizeCompatScaleMode")

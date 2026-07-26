@@ -1,4 +1,4 @@
-package com.example.flipunlock.hook
+package com.example.flipunlock.hook.systemui
 
 import android.content.ComponentName
 import android.content.Context
@@ -30,10 +30,8 @@ object SystemUIHook : BaseHook() {
         log("SystemUIHook: loading for ${param.packageName}")
         hookHideDisplayCutoutOrganizer(param)
         hookDecorWindowManager(param)
-        hookNotificationMenu(param)
         hookStatusBarClock(param)
         hookStatusBarIcons(param)
-//        hookNavigationBar(param)  // DISABLED: miuihome NavStubView no longer used
     }
 
     // ── HideDisplayCutoutOrganizer: block Shell-level cutout crop ──────
@@ -81,28 +79,10 @@ object SystemUIHook : BaseHook() {
         }.onFailure { log("SystemUI: failed hook DecorWindowManagerImpl", it) }
     }
 
-    // ── Notification menu fix ───────────────────────────────────────────
-    // MiuiNotificationMenuRow.createMenuViews runs within a scope where
-    // MiuiConfigs.isTinyScreen(Context) returns false.
-    // Belt-and-suspenders with DeviceIdentityHook's global override.
-    private fun hookNotificationMenu(param: PackageReadyParam) {
-        runCatching {
-            val miuiConfigs = param.classLoader.loadClass(
-                "com.miui.utils.configs.MiuiConfigs"
-            )
-            val fakeTinyScreen = hookScope(
-                miuiConfigs.method("isTinyScreen", Context::class.java)
-            ) { false }
-
-            val rowClass = param.classLoader.loadClass(
-                "com.android.systemui.statusbar.notification.row.MiuiNotificationMenuRow"
-            )
-            hook(rowClass.method("createMenuViews", Boolean::class.java)) { chain ->
-                fakeTinyScreen.run { chain.proceed() }
-            }
-            log("SystemUI: hooked MiuiNotificationMenuRow.createMenuViews")
-        }.onFailure { log("SystemUI: failed hook notification menu", it) }
-    }
+    // ── Notification menu ───────────────────────────────────────────────
+    // v2.9: scoped isTinyScreen→false hook REMOVED — redundant with
+    // LockScreenHook's permanent hook in the same SystemUI process.
+    // The createMenuViews hook was a no-op without the scoped override.
 
     // ── Status bar clock hiding ──────────────────────────────────────────
     // Always hide the status bar clock on the external display since
@@ -139,17 +119,10 @@ object SystemUIHook : BaseHook() {
     }
 
     // ── Status bar icon expansion ────────────────────────────────────────
-    // Expand max notification icons shown on the external display and
-    // fake isFlipTinyScreen -> false during measure/layout.
+    // Expand max notification icons shown on the external display.
+    // Note: isFlipTinyScreen→false handled by LockScreenHook globally in SystemUI.
     private fun hookStatusBarIcons(param: PackageReadyParam) {
         runCatching {
-            val miuiConfigs = param.classLoader.loadClass(
-                "com.miui.utils.configs.MiuiConfigs"
-            )
-            val fakeFlipTinyScreen = hookScope(
-                miuiConfigs.method("isFlipTinyScreen", Context::class.java)
-            ) { false }
-
             // ── NotificationIconContainer ────────────────────────────────
             val containerClass = param.classLoader.loadClass(
                 "com.android.systemui.statusbar.phone.NotificationIconContainer"
@@ -161,7 +134,7 @@ object SystemUIHook : BaseHook() {
                 runWithCleanup({
                     savedMaxIcons?.let { chain.thisObject?.setField("mMaxIcons", it) }
                 }) {
-                    fakeFlipTinyScreen.run { chain.proceed() }
+                    chain.proceed()
                 }
             }
 
@@ -177,79 +150,17 @@ object SystemUIHook : BaseHook() {
             )
 
             // ── MiuiStatusIconContainer ──────────────────────────────────
-            val statusIconClass = param.classLoader.loadClass(
-                "com.android.systemui.statusbar.views.MiuiStatusIconContainer"
-            )
-            hook(
-                statusIconClass.method("onMeasure", Int::class.java, Int::class.java)
-            ) { chain ->
-                fakeFlipTinyScreen.run { chain.proceed() }
-            }
+            // REMOVED: scoped isFlipTinyScreen hook was redundant with LockScreenHook.
+            // The onMeasure hook is a no-op without it.
 
             log("SystemUI: hooked status bar icon expansion")
         }.onFailure { log("SystemUI: failed hook status bar icons", it) }
     }
 
-    // ── [DISABLED] NavigationBar fix for miuihome ─────────────────────────
+    // ── [REMOVED] NavigationBar fix ────────────────────────────────────────
     // WAS: force NavigationBar creation so miuihome NavStubView could work.
-    // WHY DISABLED: miuihome NavStubView + LauncherHook no longer used.
+    // REMOVED v2.9: miuihome NavStubView + LauncherHook no longer used.
     // fliphome handles bottom gestures via InputMonitor, no NavStubView needed.
-    private fun hookNavigationBar(param: PackageReadyParam) {
-        val implClass = param.classLoader.loadClass(
-            "com.android.systemui.navigationbar.NavigationBarControllerImpl")
-
-        // Hook onScreenLayoutSizeChanged(Configuration)
-        // Original: if (configuration.screenType == 1) removeNavigationBar(0)
-        // Fix: temporarily set screenType=0 so isFlipTinyScreen check fails
-        runCatching {
-            val method = implClass.getDeclaredMethod("onScreenLayoutSizeChanged",
-                android.content.res.Configuration::class.java)
-            method.isAccessible = true
-            val stField = android.content.res.Configuration::class.java
-                .getDeclaredField("screenType")
-            stField.isAccessible = true
-            hook(method) { chain ->
-                val config = chain.args[0] as? android.content.res.Configuration
-                val orig = if (config != null) stField.getInt(config) else -1
-                if (orig == 1) {
-                    stField.setInt(config, 0)  // fool screenType == 1 check
-                }
-                try {
-                    chain.proceed()
-                } finally {
-                    if (orig == 1 && config != null) {
-                        stField.setInt(config, orig)  // restore
-                    }
-                }
-            }
-            log("NavBar: hooked onScreenLayoutSizeChanged")
-        }.onFailure { log("NavBar: onScreenLayoutSizeChanged failed", it) }
-
-        // Hook createNavigationBar(Display, Bundle, RegisterStatusBarResult)
-        // Bypass the mIsFsgMode && mHideGestureLine guard (line 254).
-        // Force both fields to false before the original method runs.
-        runCatching {
-            val method = implClass.getDeclaredMethod("createNavigationBar",
-                android.view.Display::class.java,
-                android.os.Bundle::class.java,
-                Class.forName("com.android.internal.statusbar.RegisterStatusBarResult"))
-            method.isAccessible = true
-            hook(method, before { chain ->
-                runCatching {
-                    val obj = chain.thisObject
-                    val injectorField = implClass.getDeclaredField("mNavigationModeControllerInjector")
-                    injectorField.isAccessible = true
-                    val injector = injectorField.get(obj)
-                    if (injector != null) {
-                        injector.javaClass.getDeclaredField("mIsFsgMode")
-                            .apply { isAccessible = true; setBoolean(injector, false) }
-                        injector.javaClass.getDeclaredField("mHideGestureLine")
-                            .apply { isAccessible = true; setBoolean(injector, false) }
-                    }
-                }
-            })
-            log("NavBar: hooked createNavigationBar")
-        }.onFailure { log("NavBar: createNavigationBar failed", it) }
-    }
+    // HyperOS 4 rewrites miuihome in Rust+Flutter — hook targets gone entirely.
 
 }

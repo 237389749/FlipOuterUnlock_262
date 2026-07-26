@@ -1,4 +1,4 @@
-package com.example.flipunlock.hook.system
+package com.example.flipunlock.hook.display
 
 import com.example.flipunlock.hook.util.*
 import io.github.libxposed.api.XposedModuleInterface.SystemServerStartingParam
@@ -42,6 +42,7 @@ object DisplayStateHook {
             hookDisplayInfoForStateToClosed(param)
             hookDisplayEnabledLocked(param)
             hookExternalDisplayDisable(param)
+            hookLayoutCutoutMode(param)     // system_server WindowLayoutStubImpl override
             hookDisplayInfoCutoutZero(param)
             hookComputeFrames(param)
             hookAodOuterScreen(param)

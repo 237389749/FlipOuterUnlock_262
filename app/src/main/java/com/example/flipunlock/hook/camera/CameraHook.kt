@@ -1,4 +1,4 @@
-package com.example.flipunlock.hook
+package com.example.flipunlock.hook.camera
 
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager

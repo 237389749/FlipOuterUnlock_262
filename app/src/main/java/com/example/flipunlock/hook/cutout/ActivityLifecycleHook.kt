@@ -1,4 +1,4 @@
-package com.example.flipunlock.hook
+package com.example.flipunlock.hook.cutout
 
 import android.app.Activity
 import android.os.Bundle

@@ -1,4 +1,4 @@
-package com.example.flipunlock.hook
+package com.example.flipunlock.hook.widget
 
 import android.content.ComponentName
 import android.content.Context

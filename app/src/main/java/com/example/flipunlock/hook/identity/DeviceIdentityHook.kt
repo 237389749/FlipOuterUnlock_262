@@ -1,4 +1,4 @@
-package com.example.flipunlock.hook
+package com.example.flipunlock.hook.identity
 
 import com.example.flipunlock.hook.util.*
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
@@ -26,11 +26,9 @@ object DeviceIdentityHook : BaseHook() {
     @Volatile private var hooksInstalled = false
 
     override fun hook(param: PackageReadyParam) {
-        // These packages need original flip behavior:
-        // - SystemUI: TinyKeyguardPanelViewController (lock screen panel)
-        // - Sogou IME: isTinyScreen controls keyboard height on outer screen
-        // - fliphome: isFlipDevice/isFlipTinyScreen needed for proper outer screen launcher init
-        if (param.packageName in setOf("com.android.systemui", "com.sohu.inputmethod.sogou.xiaomi", "com.miui.fliphome")) return
+        // Packages that need original flip behavior: lock screen, keyboard height, launcher init.
+        // List centralized in Config.identityExcludedPackages.
+        if (param.packageName in Config.identityExcludedPackages) return
 
         // Install hooks only once (called for every package due to Main.kt wildcard exception)
         if (hooksInstalled) return

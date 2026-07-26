@@ -19,52 +19,31 @@ package com.example.flipunlock.hook.util
  *   setprop persist.flipunlock.ui.recentsmenu false      # recents long-press menu
  *   setprop persist.flipunlock.ime false                 # input method freedom
  *
- * ═══ Dependency / Coupling Notes ═══
- *
- * display.dual ── FOUNDATION ──┐
- *   If disabled, state=6 is not forced. The system may fall back to native
- *   flip behavior (state=0 CLOSED or state=2 OPEN). All hooks that depend
- *   on outer=displayId=0 topology may still work but layout may differ.
- *   ↓ affects: display.aod, gesture.home, ui.lockscreen (display routing)
- *   ✗ no effect: display.cutout, gesture.back, ui.widget, ime
- *
- * gesture.back ←──── gesture.home ────→ gesture.back
- *   Coupled! Both target the same launcher identity problem:
- *   - gesture.back disables FlipLauncher (com.miui.fliphome)
- *   - gesture.home forces getIsUseMiuiHomeAsDefaultHome→true
- *   If gesture.back=OFF (FlipLauncher active) + gesture.home=ON:
- *     FlipLauncher is default home → conflict with miuihome NavStubView
- *   If gesture.back=ON (FlipLauncher disabled) + gesture.home=OFF:
- *     No default home app → HOME intent may show "choose launcher" dialog
- *   Recommended: keep both ON or both OFF together.
+ * ═══ Dependency / Coupling ═══
  *
  * display.aod ── depends on ── display.dual
- *   AOD targets displayId from DreamService (outer screen in state=6).
- *   display.dual must be ON for correct display routing.
+ *   Enforced: displayAod getter includes displayDual check. Disabling dual
+ *   automatically disables AOD.
  *
- * ui.lockscreen ── depends on ── display.dual
- *   LockScreenHook hooks SystemUI which runs on displayId=0 (outer in state=6).
- *   Independent of gesture toggles.
+ * gesture.back ── depends on ── gesture.home
+ *   Enforced: gestureBack getter includes gestureHome check. Disabling home
+ *   automatically disables back. Both target fliphome launcher identity.
  *
  * display.cutout ── INDEPENDENT ──
- *   Cutout/letterbox hooks operate at WindowManager/framework level.
- *   No dependency on any other toggle.
- *
  * ui.widget ── INDEPENDENT ──
- *   WatchOverlayHook operates in fliphome process only.
- *   No dependency on any other toggle.
- *
  * ui.controlcenter ── INDEPENDENT ──
- *   Control center style restoration targets SystemUI plugin context.
- *   No dependency on any other toggle.
- *
  * ui.recentsmenu ── INDEPENDENT ──
- *   Recents long-press menu targets fliphome recents views.
- *   No dependency on any other toggle.
- *
+ * ui.lockscreen ── INDEPENDENT ──
  * ime ── INDEPENDENT ──
- *   Input method hooks in system_server + Sogou process.
- *   No dependency on any other toggle.
+ *
+ * ═══ Centralized Exclusion Lists ═══
+ *
+ * These packages need REAL device identity or cutout info:
+ * - com.android.systemui: lock screen panel layout (TinyKeyguardPanelViewController)
+ * - com.sohu.inputmethod.sogou.xiaomi: keyboard height (isTinyScreen) + layout (safeInsetRight)
+ * - com.miui.fliphome: outer screen launcher init (isFlipDevice/isFlipTinyScreen)
+ *
+ * All hooks reference these lists — no per-file hardcoded exclusions.
  */
 object Config {
     private val keys = listOf(
@@ -81,43 +60,67 @@ object Config {
         "persist.flipunlock.ime",
     )
 
-    // Master switch
+    // ── Centralized exclusion lists ───────────────────────────────────
+    // Packages excluded from DeviceIdentityHook (need real flip identity).
+    val identityExcludedPackages: Set<String> = setOf(
+        "com.android.systemui",                     // lock screen panel layout
+        "com.sohu.inputmethod.sogou.xiaomi",         // keyboard height on outer screen
+        "com.miui.fliphome",                         // outer screen launcher init
+    )
+
+    // Packages excluded from cutout hooks (need real cutout insets).
+    val cutoutExcludedPackages: Set<String> = setOf(
+        "com.sohu.inputmethod.sogou.xiaomi",         // keyboard reads safeInsetRight for layout mode
+    )
+
+    // ── Master switch ─────────────────────────────────────────────────
     val enabled: Boolean get() = raw("persist.flipunlock.enable", true)
 
-    // Display
+    // ── Display ───────────────────────────────────────────────────────
     val displayDual: Boolean get() = enabled && raw("persist.flipunlock.display.dual", true)
-    val displayAod: Boolean get() = enabled && raw("persist.flipunlock.display.aod", true)
+
+    // display.aod depends on display.dual — AOD targets display=0 (outer in state=6).
+    // Enforced here so disabling dual automatically disables AOD.
+    val displayAod: Boolean get() = enabled && displayDual && raw("persist.flipunlock.display.aod", true)
+
     val displayCutout: Boolean get() = enabled && raw("persist.flipunlock.display.cutout", true)
 
-    // Gesture — keep together
+    // ── Gesture — back depends on home ────────────────────────────────
+    // Both target the same fliphome launcher identity. If home gestures are
+    // off, back gestures should also be off to avoid inconsistent state.
+    // Enforced here so disabling home automatically disables back.
     val gestureHome: Boolean get() = enabled && raw("persist.flipunlock.gesture.home", true)
-    val gestureBack: Boolean get() = enabled && raw("persist.flipunlock.gesture.back", true)
+    val gestureBack: Boolean get() = enabled && gestureHome && raw("persist.flipunlock.gesture.back", true)
 
-    // UI
+    // ── UI ────────────────────────────────────────────────────────────
     val uiLockScreen: Boolean get() = enabled && raw("persist.flipunlock.ui.lockscreen", true)
     val uiWidget: Boolean get() = enabled && raw("persist.flipunlock.ui.widget", true)
     val uiControlCenter: Boolean get() = enabled && raw("persist.flipunlock.ui.controlcenter", true)
     val uiRecentsMenu: Boolean get() = enabled && raw("persist.flipunlock.ui.recentsmenu", true)
 
-    // Other
+    // ── Other ─────────────────────────────────────────────────────────
     val ime: Boolean get() = enabled && raw("persist.flipunlock.ime", true)
 
-    /** Print all toggle keys and values, plus coupling warnings. */
+    /** Print all toggle keys and values, plus coupling verification. */
     fun logConfig() {
         val sb = StringBuilder("═══ FlipOuterUnlock Config ═══\n")
         for (key in keys) {
             sb.append("  $key = ${readProp(key)}\n")
         }
-        // Coupling warnings
-        if (gestureHome != gestureBack) {
-            sb.append("  ⚠ gesture.home($gestureHome) ≠ gesture.back($gestureBack) — recommended keep together\n")
-        }
+        // Verify coupling constraints (belt-and-suspenders — getters already enforce)
         if (displayAod && !displayDual) {
-            sb.append("  ⚠ display.aod=ON but display.dual=OFF — AOD may route to wrong display\n")
+            sb.append("  ⚠ display.aod=ON but display.dual=OFF (should not happen — getter enforces)\n")
         }
+        if (gestureBack && !gestureHome) {
+            sb.append("  ⚠ gesture.back=ON but gesture.home=OFF (should not happen — getter enforces)\n")
+        }
+        sb.append("  Identity excluded: ${identityExcludedPackages.joinToString()}\n")
+        sb.append("  Cutout excluded:   ${cutoutExcludedPackages.joinToString()}\n")
         sb.append("  (getprop | grep persist.flipunlock)")
         log(sb.toString())
     }
+
+    // ── Internal ──────────────────────────────────────────────────────
 
     private fun raw(key: String, default: Boolean): Boolean {
         return try {

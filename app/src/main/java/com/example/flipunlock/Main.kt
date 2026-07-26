@@ -1,32 +1,30 @@
 package com.example.flipunlock
 
-import com.example.flipunlock.hook.ActivityLifecycleHook
+import com.example.flipunlock.hook.identity.DeviceIdentityHook
+import com.example.flipunlock.hook.identity.ScreenTypeHook
+import com.example.flipunlock.hook.display.DisplayStateHook
+import com.example.flipunlock.hook.cutout.CutoutHook
+import com.example.flipunlock.hook.cutout.GlobalCutoutHook
+import com.example.flipunlock.hook.cutout.AppBoundsHook
+import com.example.flipunlock.hook.cutout.LetterboxHook
+import com.example.flipunlock.hook.cutout.ActivityLifecycleHook
+import com.example.flipunlock.hook.aod.AodHook
+import com.example.flipunlock.hook.gesture.GestureHook
+import com.example.flipunlock.hook.lockscreen.LockScreenHook
+import com.example.flipunlock.hook.systemui.SystemUIHook
+import com.example.flipunlock.hook.systemui.ControlCenterHook
+import com.example.flipunlock.hook.widget.WatchOverlayHook
+import com.example.flipunlock.hook.recents.RecentsMenuHook
+import com.example.flipunlock.hook.ime.SogouInputHook
+import com.example.flipunlock.hook.ime.InputMethodHook
+import com.example.flipunlock.hook.applaunch.CompatConfigHook
+import com.example.flipunlock.hook.applaunch.InterceptHook
+import com.example.flipunlock.hook.applaunch.WhitelistHook
+import com.example.flipunlock.hook.applaunch.SubScreenGestureHook
+import com.example.flipunlock.hook.applaunch.SystemServicesHook
+import com.example.flipunlock.hook.camera.CameraHook
 import com.example.flipunlock.hook.util.log
 import com.example.flipunlock.hook.util.Config
-//import com.example.flipunlock.hook.LauncherDensityHook  // TODO: density tweak not working
-import com.example.flipunlock.hook.SogouInputHook
-import com.example.flipunlock.hook.AodHook
-//import com.example.flipunlock.hook.CameraHook  // TODO: not working
-import com.example.flipunlock.hook.ControlCenterHook
-import com.example.flipunlock.hook.CutoutHook
-import com.example.flipunlock.hook.DeviceIdentityHook
-import com.example.flipunlock.hook.GlobalCutoutHook
-import com.example.flipunlock.hook.WatchOverlayHook
-import com.example.flipunlock.hook.RecentsMenuHook
-import com.example.flipunlock.hook.ScreenTypeHook
-import com.example.flipunlock.hook.SystemUIHook
-import com.example.flipunlock.hook.gesture.GestureHook
-//import com.example.flipunlock.hook.LauncherHook  // DISABLED: miuihome gestures unreliable
-import com.example.flipunlock.hook.LockScreenHook
-import com.example.flipunlock.hook.system.AppBoundsHook
-import com.example.flipunlock.hook.system.CompatConfigHook
-import com.example.flipunlock.hook.system.DisplayStateHook
-import com.example.flipunlock.hook.system.InputMethodHook
-import com.example.flipunlock.hook.system.InterceptHook
-import com.example.flipunlock.hook.system.LetterboxHook
-import com.example.flipunlock.hook.system.SubScreenGestureHook
-import com.example.flipunlock.hook.system.SystemServicesHook
-import com.example.flipunlock.hook.system.WhitelistHook
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
@@ -41,14 +39,11 @@ class Main : XposedModule() {
         DeviceIdentityHook,  // IS_FLIP / isFlipDevice / isFoldDevice → false
         GlobalCutoutHook,  // Display.getCutout + WindowInsets.getDisplayCutout → zero (all apps)
         AodHook,  // v2.3: screen state fix + FlipLinkageStyleController
-//        CameraHook,  // TODO: front camera redirect not working — HAL reports all cameras as LENS_FACING_BACK
         ControlCenterHook,  // v2.7: restore normal control center style on outer screen
         CutoutHook,
         SystemUIHook,
         GestureHook,  // v2: block fliphome InputMonitor → system gestures
-//        LauncherHook,  // DISABLED: miuihome NavStubView gestures unreliable on outer screen
         LockScreenHook,  // fix lock screen: swipe, shortcuts, wallpaper on outer screen
-//        LauncherDensityHook,  // Not needed: state=6 already adapts launcher to outer screen
         RecentsMenuHook,  // v2.7: recents task long-press menu (lock/unlock + app info)
         SogouInputHook,
         ActivityLifecycleHook,

@@ -1,4 +1,4 @@
-package com.example.flipunlock.hook
+package com.example.flipunlock.hook.identity
 
 import android.content.res.Configuration
 import com.example.flipunlock.hook.util.*
