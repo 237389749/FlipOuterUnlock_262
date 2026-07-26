@@ -2,7 +2,6 @@ package com.example.flipunlock.hook.applaunch
 
 import android.content.ComponentName
 import com.example.flipunlock.hook.util.*
-import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModuleInterface.SystemServerStartingParam
 
 object InterceptHook {
@@ -30,5 +29,4 @@ object InterceptHook {
 
     // v2.9: isInterceptListForProperty removed — isInterceptListUnCheckFold→false
     // already covers all 5 priority levels of the interception chain (§3, §27.2).
-}
 }
