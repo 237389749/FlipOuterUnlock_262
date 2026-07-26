@@ -165,6 +165,7 @@ For CI, add GitHub Secrets: `KEYSTORE` (base64), `KEYSTORE_PASSWORD`, `ALIAS`, `
 
 - **CameraHook** — Front camera redirect on outer screen (not working — HAL reports all cameras as LENS_FACING_BACK, fallback "1"→"0" not yet verified)
 - **FaceUnlock** — Face unlock on outer screen (confirmed infeasible — see below)
+- **Toast/hint left-shift** — `Toast.makeText()` hints appear shifted left on outer screen (custom in-app views are centered correctly). Root cause: TYPE_TOAST windows are clipped by the cutout safe area during WindowLayout.computeFrames() in system_server. Multiple hook points tried (InsetsState.getDisplayCutoutSafe, getLayoutInDisplayCutoutMode, computeFrames output fix) without success — the frames may be narrowed upstream of computeFrames, or MIUI has an additional clipping layer not yet identified. Present since initial release.
 
 ### Known Issues (Unfolded State)
 
@@ -284,6 +285,7 @@ CI: GitHub Secrets → `KEYSTORE`(base64), `KEYSTORE_PASSWORD`, `ALIAS`, `KEY_PA
 
 - **CameraHook** — 外屏前置摄像头重定向（不生效 — HAL 上报所有摄像头均为 LENS_FACING_BACK，回退方案 "1"→"0" 未验证）
 - **FaceUnlock** — 外屏人脸解锁（已确认不可行 — 详见下）
+- **Toast/提示左移** — `Toast.makeText()` 类提示在外屏偏左（自定义 View 类提示正常居中）。根因：TYPE_TOAST 窗口在 system_server 的 WindowLayout.computeFrames() 中被 cutout 安全区削窄。已尝试 InsetsState.getDisplayCutoutSafe、getLayoutInDisplayCutoutMode、computeFrames 输出修正等多层 hook，均未生效——帧可能在 computeFrames 上游即已被削窄，或 MIUI 存在额外的裁剪层。从初始版本即存在。
 
 ### 已知问题（展开状态下）
 
