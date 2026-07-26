@@ -4,7 +4,13 @@ import com.example.flipunlock.hook.util.*
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
 
 /**
+ * [DISABLED as of v2.7.1 — commented out in Main.kt]
+ *
  * Fix miuihome inner launcher gesture navigation on the outer screen (state=6).
+ * DISABLED because miuihome NavStubView gestures are unreliable on outer screen:
+ * Shell/WindowTransition engine broken in state=6 topology; Gate 6c workaround
+ * slow; gestures randomly disappear. Now using fliphome's InputMonitor-based
+ * gestures instead. File kept for reference.
  *
  * Three issues prevent bottom gestures (Home/Recents) from working:
  *

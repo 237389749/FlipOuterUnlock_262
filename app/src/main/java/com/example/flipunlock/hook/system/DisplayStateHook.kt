@@ -175,9 +175,11 @@ object DisplayStateHook {
         }.onFailure { log("DisplayState: failed hook DeviceStateToLayoutMap.get", it) }
     }
 
-    // ── 2. App layer: always unfolded → flip restrictions disabled ──────
-    // ContinuityPolicyService.onDeviceStateChanged(boolean folded)
-    // Force false = unfolded regardless of actual sensor.
+    // ── 2. [DISABLED] App layer force unfolded ──────────────────────────
+    // WAS: ContinuityPolicyService.onDeviceStateChanged(false) → force unfolded
+    // WHY DISABLED: side effect → system uses CATEGORY_HOME (miuihome) instead
+    // of CATEGORY_SECONDARY_HOME (fliphome) on outer screen. App restrictions
+    // covered by CompatConfigHook + InterceptHook + WhitelistHook.
     private fun hookAppLayerToUnfolded(param: SystemServerStartingParam) {
         runCatching {
             val cpsClass = param.classLoader.loadClass(

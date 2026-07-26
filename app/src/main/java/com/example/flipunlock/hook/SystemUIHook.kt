@@ -190,23 +190,10 @@ object SystemUIHook : BaseHook() {
         }.onFailure { log("SystemUI: failed hook status bar icons", it) }
     }
 
-    // ── NavigationBar fix: force creation on flip outer screen ─────────
-    //
-    // NavigationBarControllerImpl creates the gesture navigation bar.
-    // Two guards prevent it on flip outer screens:
-    //
-    // 1. createNavigationBar() checks:
-    //      isFlipTinyScreen(context) → return (fixed by LockScreenHook)
-    //      mIsFsgMode && mHideGestureLine → return (hooked below)
-    //
-    // 2. onScreenLayoutSizeChanged() checks:
-    //      configuration.screenType == 1 → removeNavigationBar(0)
-    //      This uses the RAW screenType FIELD, bypassing ScreenTypeHook!
-    //      Fix: temporarily force screenType=0 so the check fails,
-    //      allowing the nav bar to be created/kept.
-    //
-    // Without NavigationBar, bottom gestures (Home/Recents) are absent
-    // in all apps. Desktop works via miuihome's NavStubView (LauncherHook).
+    // ── [DISABLED] NavigationBar fix for miuihome ─────────────────────────
+    // WAS: force NavigationBar creation so miuihome NavStubView could work.
+    // WHY DISABLED: miuihome NavStubView + LauncherHook no longer used.
+    // fliphome handles bottom gestures via InputMonitor, no NavStubView needed.
     private fun hookNavigationBar(param: PackageReadyParam) {
         val implClass = param.classLoader.loadClass(
             "com.android.systemui.navigationbar.NavigationBarControllerImpl")

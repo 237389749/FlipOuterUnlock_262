@@ -138,7 +138,9 @@ object GestureHook : BaseHook() {
         }.onFailure { log("GestureFix: side gesture persistence failed", it) }
     }
 
-    // ── 3. Disable FlipLauncher component (keep process alive) ───────────
+    // ── 3. [DISABLED] Disable FlipLauncher component ─────────────────────
+    // WAS: disable FlipLauncher so miuihome could take over as launcher.
+    // WHY DISABLED: fliphome is now the active launcher on outer screen.
     private fun disableFlipLauncher(param: PackageReadyParam) {
         if (launcherDisabled) return
         runCatching {
