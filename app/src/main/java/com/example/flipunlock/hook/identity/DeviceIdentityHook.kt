@@ -1,5 +1,7 @@
 package com.example.flipunlock.hook.identity
 
+import com.example.flipunlock.hook.BaseHook
+
 import com.example.flipunlock.hook.util.*
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
 

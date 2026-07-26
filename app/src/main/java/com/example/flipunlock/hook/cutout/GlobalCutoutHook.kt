@@ -1,5 +1,7 @@
 package com.example.flipunlock.hook.cutout
 
+import com.example.flipunlock.hook.BaseHook
+
 import android.view.Display
 import android.view.DisplayCutout
 import com.example.flipunlock.hook.util.*
@@ -21,6 +23,7 @@ object GlobalCutoutHook : BaseHook() {
         if (!Config.displayCutout) return
         // Packages that need real cutout for layout — centralized in Config.cutoutExcludedPackages.
         if (param.packageName in Config.cutoutExcludedPackages) return
+        val pkg = param.packageName
         safeHook("GlobalCutout") {
             hookLayoutCutoutMode(param)
             hookDisplayGetCutout(pkg)

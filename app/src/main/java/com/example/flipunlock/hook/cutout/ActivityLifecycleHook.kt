@@ -1,5 +1,7 @@
 package com.example.flipunlock.hook.cutout
 
+import com.example.flipunlock.hook.BaseHook
+
 import android.app.Activity
 import android.os.Bundle
 import android.view.WindowManager

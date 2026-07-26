@@ -1,5 +1,7 @@
 package com.example.flipunlock.hook.widget
 
+import com.example.flipunlock.hook.BaseHook
+
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager

@@ -1,5 +1,7 @@
 package com.example.flipunlock.hook.ime
 
+import com.example.flipunlock.hook.BaseHook
+
 import com.example.flipunlock.hook.util.*
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
