@@ -32,7 +32,7 @@ object GestureHook : BaseHook() {
         if (!Config.gestureBack) { log("GestureFix: DISABLED by persist.flipunlock.gesture.back"); return }
         log("GestureFix: setupHooks")
         hookNoStartPage(param)
-        disableFlipLauncher(param)
+//        disableFlipLauncher(param)  // DISABLED: fliphome is now the active launcher
         hookSideGesturePersistence(param)
     }
 
