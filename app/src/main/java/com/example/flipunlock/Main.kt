@@ -46,7 +46,7 @@ class Main : XposedModule() {
         CutoutHook,
         SystemUIHook,
         GestureHook,  // v2: block fliphome InputMonitor → system gestures
-        LauncherHook,  // block SpecialFDeviceGestureHelper → keep NavStubView on outer screen
+//        LauncherHook,  // DISABLED: miuihome NavStubView gestures unreliable on outer screen
         LockScreenHook,  // fix lock screen: swipe, shortcuts, wallpaper on outer screen
 //        LauncherDensityHook,  // Not needed: state=6 already adapts launcher to outer screen
         RecentsMenuHook,  // v2.7: recents task long-press menu (lock/unlock + app info)
