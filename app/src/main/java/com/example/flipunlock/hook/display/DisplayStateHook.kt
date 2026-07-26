@@ -38,13 +38,11 @@ object DisplayStateHook {
         safeHook("DisplayStateHook") {
             hookDisplayToClosed(param)
             hookDisplayLayoutGet(param)
-//            hookAppLayerToUnfolded(param)  // DISABLED: getHomeIntent crash; use CompatConfig+Intercept+Whitelist instead
-            hookDisplayInfoForStateToClosed(param)
-            hookDisplayEnabledLocked(param)
-            hookExternalDisplayDisable(param)
+//            hookAppLayerToUnfolded(param)  // DISABLED: getHomeIntent crash — crash warning
             hookLayoutCutoutMode(param)     // system_server WindowLayoutStubImpl override
             hookDisplayInfoCutoutZero(param)
             hookComputeFrames(param)
+            hookLargestAppWidth(param)       // letterboxFullBounds width fix
             hookAodOuterScreen(param)
         }
     }
@@ -202,84 +200,12 @@ object DisplayStateHook {
         }.onFailure { log("DisplayState: failed hook ContinuityPolicyService", it) }
     }
 
-    // ── 3. DisplayInfo query: always return CLOSED state info ─────────────
-    // getDisplayInfoForStateLocked(int deviceState, int displayId)
-    // Queries display info for a hypothetical state. SystemUI uses this
-    // to pre-compute layouts before fold/unfold. Force state=0 so all
-    // callers see outer screen layout regardless of queried state.
-    private fun hookDisplayInfoForStateToClosed(param: SystemServerStartingParam) {
-        runCatching {
-            val mapperClass = param.classLoader.loadClass(
-                "com.android.server.display.LogicalDisplayMapper"
-            )
-            val method = mapperClass.method(
-                "getDisplayInfoForStateLocked",
-                Int::class.javaPrimitiveType!!,
-                Int::class.javaPrimitiveType!!
-            )
-            hook(method) { chain ->
-                if (isOuterScreen()) {
-                    chain.args[0] = 0  // force deviceState=0 (CLOSED)
-                }
-                chain.proceed()
-            }
-            log("DisplayState: forced getDisplayInfoForStateLocked -> state=0 when folded")
-        }.onFailure { log("DisplayState: failed hook getDisplayInfoForStateLocked", it) }
-    }
+    // v2.9: getDisplayInfoForStateLocked removed — DeviceStateToLayoutMap.get→state=6
+    // returns correct layout for any queried state.
 
-    // ── 4. Defense-in-depth: force all displays enabled ──────────────────
-    //    DeviceStateToLayoutMap.get() → state=6 already enables both displays
-    //    via the layout. These hooks prevent any OTHER code path from disabling
-    //    a display at a lower level.
-
-    // 4a. LogicalDisplay.isEnabledLocked() → always true
-    //     Prevents any caller from seeing a display as "disabled".
-    //     Called by: ExternalDisplayPolicy, DisplayManagerService,
-    //     LogicalDisplayMapper.setEnabledLocked, etc.
-    private fun hookDisplayEnabledLocked(param: SystemServerStartingParam) {
-        runCatching {
-            val cls = param.classLoader.loadClass(
-                "com.android.server.display.LogicalDisplay")
-            val method = cls.getDeclaredMethod("isEnabledLocked")
-            method.isAccessible = true
-            hook(method) { chain ->
-                if (isOuterScreen()) {
-                    true
-                } else {
-                    chain.proceed()
-                }
-            }
-            log("DisplayState: isEnabledLocked → true when outer screen")
-        }.onFailure { log("DisplayState: isEnabledLocked failed", it) }
-    }
-
-    // 4b. ExternalDisplayPolicy.disableExternalDisplayLocked() → no-op
-    //     Explicitly blocks the external display disable policy.
-    //     Original code checks isEnabledLocked + display type, then disables.
-    private fun hookExternalDisplayDisable(param: SystemServerStartingParam) {
-        runCatching {
-            val cls = param.classLoader.loadClass(
-                "com.android.server.display.ExternalDisplayPolicy")
-            val method = cls.getDeclaredMethod("disableExternalDisplayLocked",
-                Int::class.javaPrimitiveType!!)
-            method.isAccessible = true
-            hook(method) { chain ->
-                if (isOuterScreen()) {
-                    log("DisplayState: BLOCKED disableExternalDisplayLocked(${chain.args[0]})")
-                    null
-                } else {
-                    chain.proceed()
-                }
-            }
-            log("DisplayState: disableExternalDisplayLocked → blocked when outer screen")
-        }.onFailure { log("DisplayState: disableExternalDisplayLocked failed", it) }
-
-        // §5. Fix letterbox: correct largestNominalAppWidth for outer screen.
-        //     LogicalDisplay sets largestNominalAppWidth=height (1392) instead of
-        //     width (1208) for ROTATION_180 displays, causing letterboxFullBounds
-        //     to be 1392px wide on a 1208px screen → content shifted left.
-        hookLargestAppWidth(param)
-    }
+    // v2.9: isEnabledLocked + disableExternalDisplayLocked + getDisplayInfoForStateLocked
+    // removed — DeviceStateToLayoutMap.get→state=6 already enables both displays.
+    // §5 retained: letterbox width fix is independent of display enablement.
 
     private fun hookLargestAppWidth(param: SystemServerStartingParam) {
         runCatching {

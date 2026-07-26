@@ -11,7 +11,6 @@ object InterceptHook {
         log("InterceptHook: setting up")
         safeHook("InterceptHook") {
             hookIsInterceptListUnCheckFold(param)
-            hookIsInterceptListForProperty(param)
         }
         log("InterceptHook: done")
     }
@@ -29,23 +28,7 @@ object InterceptHook {
         }.onFailure { log("failed to hook isInterceptListUnCheckFold", it) }
     }
 
-    private fun hookIsInterceptListForProperty(param: SystemServerStartingParam) {
-        runCatching {
-            val interceptClass = param.classLoader.loadClass(
-                "com.android.server.wm.InterceptActivityController"
-            )
-            val method = interceptClass.method(
-                "isInterceptListForProperty", ComponentName::class.java, String::class.java
-            )
-            val classLoader = param.classLoader
-            hook(method, Hooker { chain ->
-                runCatching {
-                    val pairClass = classLoader.loadClass("android.util.Pair")
-                    val pairConstructor = pairClass.getConstructor(Any::class.java, Any::class.java)
-                    pairConstructor.newInstance(false, false)
-                }.getOrElse { chain.proceed() }
-            })
-            log("forced isInterceptListForProperty -> Pair(false, false)")
-        }.onFailure { log("failed to hook isInterceptListForProperty", it) }
-    }
+    // v2.9: isInterceptListForProperty removed — isInterceptListUnCheckFold→false
+    // already covers all 5 priority levels of the interception chain (§3, §27.2).
+}
 }

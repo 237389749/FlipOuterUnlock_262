@@ -11,7 +11,6 @@ import com.example.flipunlock.hook.util.*
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
 import io.github.libxposed.api.XposedModuleInterface.SystemServerStartingParam
-import java.util.Collections
 
 object CutoutHook : BaseHook() {
     override val targetPackages = listOf(
@@ -20,17 +19,13 @@ object CutoutHook : BaseHook() {
         "com.android.camera",
     )
 
-    private var zeroCutout: DisplayCutout? = null
-
     fun hookFramework(param: SystemServerStartingParam) {
         if (!Config.displayCutout) { log("CutoutHook: DISABLED by persist.flipunlock.display.cutout"); return }
         log("CutoutHook-framework: setting up in system_server")
         safeHook("CutoutHook-framework") {
             hookCutoutParser(param.classLoader)
             hookPathAndDisplayCutoutFromSpec(param.classLoader)
-            hookDisplayGetCutout()
             hookDisplayFlipFoldedCutout()
-            hookWindowInsetsGetCutout()
         }
     }
 
@@ -39,10 +34,10 @@ object CutoutHook : BaseHook() {
         log("CutoutHook: loading for ${param.packageName}")
         hookCutoutParser(param.classLoader)
         hookPathAndDisplayCutoutFromSpec(param.classLoader)
-        hookDisplayGetCutout()
         hookDisplayFlipFoldedCutout()
         hookDisplayUtilsGetCutoutPosition(param)
-        hookWindowInsetsGetCutout()
+        // Display.getCutout + WindowInsets.getDisplayCutout: covered by GlobalCutoutHook (broader scope).
+        // computeSafeInsets: covered by Parser.parse→zero spec (definition layer root).
     }
 
     private fun hookCutoutParser(classLoader: ClassLoader) {
@@ -105,20 +100,8 @@ object CutoutHook : BaseHook() {
         }.onFailure { log("CutoutFix: failed hook pathAndDisplayCutoutFromSpec", it) }
     }
 
-    private fun hookDisplayGetCutout() {
-        runCatching {
-            val getCutoutMethod = Display::class.java.method("getCutout")
-            // beforeHookedMethod: replace result with zero cutout, or proceed if unavailable
-            hook(getCutoutMethod, Hooker { chain ->
-                val zero = getZeroCutout()
-                if (zero != null) {
-                    zero
-                } else {
-                    chain.proceed()
-                }
-            })
-        }.onFailure { log("CutoutFix: failed hook Display.getCutout", it) }
-    }
+    // Display.getCutout: covered by GlobalCutoutHook (all processes, NO_CUTOUT static field).
+    // WindowInsets.getDisplayCutout: covered by GlobalCutoutHook.
 
     // MIUI hidden method: Display.getFlipFoldedCutout()
     // Called reflectively by AlertController (miuix.jar) to get the
@@ -144,53 +127,6 @@ object CutoutHook : BaseHook() {
         }.onFailure { log("CutoutFix: failed hook DisplayUtils", it) }
     }
 
-    private fun getZeroCutout(): DisplayCutout? {
-        if (zeroCutout != null) return zeroCutout
-        runCatching {
-            zeroCutout = constructZeroCutout()
-        }.onFailure { log("CutoutFix: construct zero cutout failed", it) }
-        return zeroCutout
-    }
-
-    /**
-     * Hook WindowInsets.getDisplayCutout() → always return null.
-     *
-     * Display.getCutout() and the CutoutSpecification parser are already zeroed,
-     * but WindowInsets carries its own DisplayCutout reference that is computed
-     * at layout time and delivered to views via onApplyWindowInsets(). SystemUI
-     * notification views (heads-up popups, NotificationStackScrollLayout) read
-     * the cutout from WindowInsets, NOT from Display.getCutout(), so they still
-     * see the real cutout and shift content to avoid the camera hole.
-     *
-     * This hook closes that gap — any view consuming WindowInsets will see no cutout.
-     */
-    private fun hookWindowInsetsGetCutout() {
-        runCatching {
-            val insetsClass = android.view.WindowInsets::class.java
-            val method = insetsClass.getDeclaredMethod("getDisplayCutout")
-            method.isAccessible = true
-            hook(method, replaceResult(null))
-            log("CutoutFix: WindowInsets.getDisplayCutout → null")
-        }.onFailure { log("CutoutFix: WindowInsets.getDisplayCutout failed", it) }
-    }
-
-    private fun constructZeroCutout(): DisplayCutout {
-        val dcClass = DisplayCutout::class.java
-        val constructor = dcClass.declaredConstructors.minByOrNull { it.parameterCount }
-            ?: throw NoSuchMethodException("No DisplayCutout constructor")
-        constructor.isAccessible = true
-        val paramTypes = constructor.parameterTypes
-        val args = paramTypes.map { type ->
-            when (type) {
-                Insets::class.java -> Insets.of(0, 0, 0, 0)
-                Rect::class.java -> Rect(0, 0, 0, 0)
-                Path::class.java -> Path()
-                Int::class.javaPrimitiveType, Integer::class.java -> 0
-                Boolean::class.javaPrimitiveType, java.lang.Boolean::class.java -> false
-                java.util.List::class.java -> Collections.emptyList<Any>()
-                else -> null
-            }
-        }.toTypedArray()
-        return constructor.newInstance(*args) as DisplayCutout
-    }
+    // computeSafeInsets: covered by Parser.parse→zero spec.
+    // Display.getCutout + WindowInsets.getDisplayCutout: covered by GlobalCutoutHook.
 }

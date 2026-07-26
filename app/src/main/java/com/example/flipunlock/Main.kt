@@ -14,15 +14,13 @@ import com.example.flipunlock.hook.lockscreen.LockScreenHook
 import com.example.flipunlock.hook.systemui.SystemUIHook
 import com.example.flipunlock.hook.systemui.ControlCenterHook
 import com.example.flipunlock.hook.widget.WatchOverlayHook
-import com.example.flipunlock.hook.recents.RecentsMenuHook
+import com.example.flipunlock.hook.recents.DisplayFilterFix
 import com.example.flipunlock.hook.ime.SogouInputHook
 import com.example.flipunlock.hook.ime.InputMethodHook
-import com.example.flipunlock.hook.applaunch.CompatConfigHook
 import com.example.flipunlock.hook.applaunch.InterceptHook
 import com.example.flipunlock.hook.applaunch.WhitelistHook
 import com.example.flipunlock.hook.applaunch.SubScreenGestureHook
 import com.example.flipunlock.hook.applaunch.SystemServicesHook
-import com.example.flipunlock.hook.camera.CameraHook
 import com.example.flipunlock.hook.util.log
 import com.example.flipunlock.hook.util.Config
 import io.github.libxposed.api.XposedModule
@@ -44,7 +42,7 @@ class Main : XposedModule() {
         SystemUIHook,
         GestureHook,  // v2: block fliphome InputMonitor → system gestures
         LockScreenHook,  // fix lock screen: swipe, shortcuts, wallpaper on outer screen
-        RecentsMenuHook,  // v2.7: recents task long-press menu (lock/unlock + app info)
+        DisplayFilterFix,  // Gate 7: prevent display-ID task filtering in fliphome recents
         SogouInputHook,
         ActivityLifecycleHook,
         WatchOverlayHook,
@@ -62,7 +60,6 @@ class Main : XposedModule() {
         WhitelistHook.hook(param)
         SubScreenGestureHook.hook(param)
         DisplayStateHook.hook(param)
-        CompatConfigHook.hook(param)
         AppBoundsHook.hook(param)
         SystemServicesHook.hook(param)
         InputMethodHook.hook(param)
