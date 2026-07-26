@@ -1,6 +1,6 @@
 # FlipOuterUnlock / MIX Flip 外屏解锁模块
 
-> **`master`** — UI 分支（带 Compose 设置界面） | **`main`** — 稳定分支（纯 hook 无界面）
+> **`main`** — 稳定分支（纯 hook 无界面） | **`master`** — UI 分支（带 Compose 设置界面）
 >
 > Make the MIX Flip outer screen behave like a normal phone display.
 > 让 MIX Flip 外屏像普通手机屏幕一样工作。
@@ -27,9 +27,9 @@ LSPosed module for Xiaomi MIX Flip / MIX Flip 2 — unlock the outer display.
 - Fix app bounds on cold start and configuration changes
 
 **Device Identity**
-- Spoof device identity — hooks 7 detection paths: `MiuiMultiDisplayTypeInfo.isFlipDevice()`, `miui.os.Build`, `miuix.os.Build.IS_FLIP`, `DeviceUtils`, `DeviceHelper`, `MiuiConfigs`. Excludes SystemUI (lock screen) and Sogou IME (keyboard height)
+- Spoof device identity — hooks 7 detection paths: `MiuiMultiDisplayTypeInfo.isFlipDevice()`, `miui.os.Build`, `miuix.os.Build.IS_FLIP`, `DeviceUtils`, `DeviceHelper`, `MiuiConfigs`
+- Excludes SystemUI (lock screen panel), Sogou IME (keyboard height), fliphome (launcher init) — centralized in `Config.identityExcludedPackages`
 - Spoof screen type — hooks MIUI's `Configuration.getScreenType()` to return 0 (EXPAND)
-- Scan orientation may vary by app — some require holding the camera side down before opening
 
 **App Management**
 - Whitelist all apps for continuity — uses `ContinuityPolicyService` dump injection
@@ -45,18 +45,21 @@ LSPosed module for Xiaomi MIX Flip / MIX Flip 2 — unlock the outer display.
 
 **SystemUI**
 - Widget overlay disabled — 4-layer defense in fliphome process
-- SystemUI-side widget suppression — hides decor window
-- Control center style restored — hooks plugin classloader to replace COMPACT with VERTICAL layout, enables QS tile long-press, fixes device center card layout (v2.7)
-- Notification menu fix — restores long-press menu via `isTinyScreen` scope faking
+- Control center style restored — hooks plugin classloader to replace COMPACT with VERTICAL layout, enables QS tile long-press, fixes device center card layout
+- Notification menu fix — `isTinyScreen` handled globally by LockScreenHook
 - Status bar clock hidden on outer screen
 - Status bar icon expansion — shows up to 8 notification icons
-- Recents task long-press menu — lock/unlock + app info popup on fliphome recents view (v2.7)
-- System gestures (back) — blocks fliphome FlipLauncher, keeps GestureStubView edge back
-- System gestures (home/recents) — fixes miuihome NavStubView 3-gate: fold removal, hideGestureLine, default-home check
-- Always-On Display enabled on outer screen when folded (v2.3 — screen state fix)
-- Front camera redirect to main back camera (v2 — dynamic LENS_FACING enumeration)
+- Recents task long-press menu — lock/unlock + app info popup on fliphome recents view
+- System gestures (back) — fliphome native InputMonitor handles swipe-up gestures
+- Always-On Display enabled on outer screen when folded (v2.3: screen state fix + FlipLinkageStyleController)
 - Sub-screen double-tap + 3-finger swipe gestures (displayId fix for state=6)
 - Feature toggles — SystemProperties-based, reboot-required, no UI
+
+**v2.9 Changes**
+- Removed miuihome hooks (LauncherHook, LauncherDensityHook, hookNavigationBar): HyperOS 4 rewrites miuihome in Rust+Flutter — hook targets gone. fliphome is now the active launcher on outer screen via its native InputMonitor.
+- Removed side gesture persistence hacks: no longer needed with fliphome-native gesture lifecycle.
+- Config coupling enforced: `gestureBack` getter includes `gestureHome`; `displayAod` includes `displayDual`. No more log-only warnings — disabling the prerequisite automatically disables the dependent feature.
+- Exclusion lists centralized in Config.kt: `identityExcludedPackages`, `cutoutExcludedPackages` — no per-file hardcoded exclusions.
 
 ### Feature Toggles
 
@@ -79,48 +82,93 @@ reboot
 |----------|---------|----------|
 | `persist.flipunlock.enable` | true | **Master kill switch** — false disables everything |
 | `persist.flipunlock.display.dual` | true | Dual display (DisplayStateHook: force state=6, display enable) |
-| `persist.flipunlock.display.aod` | true | Outer screen AOD |
-| `persist.flipunlock.display.cutout` | true | Remove cutout + letterbox + appBounds + lifecycle |
-| `persist.flipunlock.gesture.home` | true | Bottom gestures: home/recents (LauncherHook) |
-| `persist.flipunlock.gesture.back` | true | Back gestures: disable FlipLauncher (GestureHook) |
+| `persist.flipunlock.display.aod` | true | Outer screen AOD (depends on display.dual — getter enforces) |
+| `persist.flipunlock.display.cutout` | true | Remove cutout + letterbox + appBounds + frame fixes |
+| `persist.flipunlock.gesture.home` | true | Home gesture via fliphome InputMonitor |
+| `persist.flipunlock.gesture.back` | true | Back gestures via GestureStubView (depends on gesture.home) |
 | `persist.flipunlock.ui.lockscreen` | true | Lock screen large layout (LockScreenHook) |
 | `persist.flipunlock.ui.widget` | true | Disable widget overlay (WatchOverlayHook) |
 | `persist.flipunlock.ui.controlcenter` | true | Control center style restore (ControlCenterHook) |
 | `persist.flipunlock.ui.recentsmenu` | true | Recents long-press menu (RecentsMenuHook) |
 | `persist.flipunlock.ime` | true | Input method freedom (InputMethodHook + Sogou) |
 
-**Coupling**: `gesture.home` and `gesture.back` should be kept together (both ON or both OFF). `display.aod` depends on `display.dual`. Module logs warnings at startup if mismatched. `display.cutout`, `ui.widget`, `ui.controlcenter`, `ui.recentsmenu`, `ime` are independent.
-
 ### Hook Architecture
 
-```
-onSystemServerStarting (system_server):
-├── DisplayStateHook          → dual display + enable guard + AOD power
-├── CutoutHook.hookFramework  → Display.getCutout + Parser
-├── LetterboxHook             → isLetterboxedForDisplayCutout → false
-├── WhitelistHook             → ContinuityPolicyService dump
-├── CompatConfigHook          → continuity.policy + PROPERTY_COMPAT
-├── AppBoundsHook             → fillInsetsState + LaunchActivityItem
-├── SystemServicesHook        → BoundsCompatUtils + getFullScreenValue
-├── InputMethodHook           → shouldShowCurrentInput + isFlipTinyScreen
-├── InterceptHook             → isInterceptListUnCheckFold
-└── SubScreenGestureHook      → displayId redirect (1→0) for state=6
+Codebase organized by **functional directory** — each directory maps to a setprop toggle:
 
-onPackageReady:
-├── DeviceIdentityHook [* excl. SystemUI, Sogou] → isFlipDevice + 6 static fields
-├── ScreenTypeHook [*]          → getScreenType → 0 (EXPAND)
-├── AodHook [systemui, aod]     → v2.3: screen state fix + FlipLinkageStyleController
-├── CameraHook [camera]         → v2: dynamic LENS_FACING enumeration (disabled)
-├── ControlCenterHook [systemui] → v2.7: plugin style COMPACT→VERTICAL + tile long-press + device center
-├── CutoutHook [systemui, aod, camera]
-├── SystemUIHook [systemui]     → widget decor, notification, clock, icons, NavigationBar force
-├── GestureHook [fliphome]      → disable FlipLauncher + block start pages
-├── LauncherHook [miui.home]    → 3-gate NavStubView fix: fold + hideLine + defaultHome
-├── LockScreenHook [systemui]   → lock screen large layout: isTinyScreen/FlipTinyScreen/Instant toggles
-├── RecentsMenuHook [fliphome]  → v2.7: task long-press → popup (lock/unlock + app info)
-├── WatchOverlayHook [fliphome] → 5-layer widget defense: root getWatchOverlay()→null + 4 layers
-├── SogouInputHook [sogou]      → toolbar + clipboard (DexKit)
-└── ActivityLifecycleHook [*]   → layoutInDisplayCutoutMode=ALWAYS
+```
+hook/
+├── BaseHook.kt                  # Abstract base class (8 lines)
+
+├── identity/                    # No toggle — always on
+│   ├── DeviceIdentityHook.kt    # 7 detection paths → false (wildcard, excludes SystemUI/Sogou/fliphome)
+│   └── ScreenTypeHook.kt        # getScreenType() → 0 (wildcard)
+
+├── display/                     # persist.flipunlock.display.dual
+│   └── DisplayStateHook.kt      # state=6, display enable, display info overrides
+
+├── cutout/                      # persist.flipunlock.display.cutout
+│   ├── CutoutHook.kt            # Parser + pathAndDisplayCutoutFromSpec + framework hooks
+│   ├── GlobalCutoutHook.kt      # Display.getCutout + WindowInsets + size-compat (wildcard)
+│   ├── AppBoundsHook.kt         # fillInsetsState + 3 config paths (system_server)
+│   ├── LetterboxHook.kt         # isLetterboxedForDisplayCutout → false (system_server)
+│   └── ActivityLifecycleHook.kt # layoutInDisplayCutoutMode=ALWAYS per Activity (wildcard)
+
+├── aod/                         # persist.flipunlock.display.aod
+│   └── AodHook.kt               # L1 (framework DreamService) + L2 (DozeMachine runtime)
+
+├── gesture/                     # persist.flipunlock.gesture.home + .back
+│   └── GestureHook.kt           # fliphome launcher: no start page + ensure FlipLauncher enabled
+
+├── lockscreen/                  # persist.flipunlock.ui.lockscreen
+│   └── LockScreenHook.kt        # isTinyScreen/isFlipTinyScreen → false + panel controller → Dummy
+
+├── systemui/                    # Mixed: status bar always-on, control center toggled
+│   ├── SystemUIHook.kt          # Status bar clock/icons, HideDisplayCutoutOrganizer, decor window
+│   └── ControlCenterHook.kt     # Plugin style COMPACT→VERTICAL + tile long-press + device center
+
+├── widget/                      # persist.flipunlock.ui.widget
+│   └── WatchOverlayHook.kt      # 4-layer defense: controller → view → window → WM.addView
+
+├── recents/                     # persist.flipunlock.ui.recentsmenu
+│   └── RecentsMenuHook.kt       # Long-press popup menu + Gate 7 (display-ID task filter fix)
+
+├── ime/                         # persist.flipunlock.ime
+│   ├── InputMethodHook.kt       # system_server: shouldShowCurrentInput + isFlipTinyScreen
+│   └── SogouInputHook.kt        # Sogou process: toolbar + clipboard (DexKit)
+
+├── applaunch/                   # No toggle — always on
+│   ├── CompatConfigHook.kt      # continuity.policy → 5 (system_server)
+│   ├── InterceptHook.kt         # isInterceptListUnCheckFold → false (system_server)
+│   ├── WhitelistHook.kt         # dump command whitelist (system_server)
+│   ├── SubScreenGestureHook.kt  # displayId redirect 1→0 for state=6 (system_server)
+│   └── SystemServicesHook.kt    # BoundsCompatUtils + WindowManager fullscreen (system_server)
+
+├── camera/                      # Disabled — blocked by hardware (all cameras report LENS_FACING_BACK)
+│   └── CameraHook.kt            # Dynamic LENS_FACING enumeration (correct architecture, H/W limit)
+
+└── util/
+    ├── Config.kt                # Feature toggles + centralized exclusion lists + coupling enforcement
+    ├── HookUtils.kt             # hook(), safeHook(), hookScope(), DexKit bridge
+    └── ReflectUtils.kt          # Reflection shortcuts
+```
+
+**Activation order:**
+
+```
+1. System Server (onSystemServerStarting):
+   CutoutHook.hookFramework()  →  DisplayStateHook  →  LetterboxHook
+   WhitelistHook  →  SubScreenGestureHook  →  CompatConfigHook
+   AppBoundsHook  →  SystemServicesHook  →  InputMethodHook  →  InterceptHook
+
+2. First Package (isFirstPackage=true):
+   DeviceIdentityHook (*)  →  ScreenTypeHook (*)  →  GlobalCutoutHook (*)
+   ActivityLifecycleHook (*)  →  CutoutHook (framework)
+
+3. Target Packages:
+   AodHook (systemui, aod)  →  SystemUIHook (systemui)  →  LockScreenHook (systemui)
+   ControlCenterHook (systemui)  →  GestureHook (fliphome)  →  WatchOverlayHook (fliphome)
+   RecentsMenuHook (fliphome)  →  SogouInputHook (sogou)
 ```
 
 ### Requirements
@@ -160,6 +208,8 @@ For CI, add GitHub Secrets: `KEYSTORE` (base64), `KEYSTORE_PASSWORD`, `ALIAS`, `
 
 - [MixFlipMod](https://github.com/parallelcc/MixFlipMod) by Parallelc — reference for LSPosed architecture, SogouHook, DexKit usage, SystemUI hooks, and hook utilities
 - Reverse engineering references in `refMD/cleaned/` (decompiled MIUI framework, services, fliphome APKs)
+- `COUPLING_REVIEW.md` — full coupling/cohesion audit (2026-07-26)
+- `REFACTOR_PLAN.md` — consolidation plan with per-agent call-chain analysis
 
 ### TODO
 
@@ -189,9 +239,9 @@ AGPL-3.0
 - 修复冷启动与配置变更时 appBounds
 
 **设备身份**
-- 伪装设备类型：hook 7 条检测路径（`MiuiMultiDisplayTypeInfo.isFlipDevice()`、`miui.os.Build`、`miuix.os.Build.IS_FLIP`、`DeviceUtils`、`DeviceHelper`、`MiuiConfigs`）。排除 SystemUI（锁屏）和 Sogou 输入法（键盘高度）
+- 伪装设备类型：hook 7 条检测路径（`MiuiMultiDisplayTypeInfo.isFlipDevice()`、`miui.os.Build`、`miuix.os.Build.IS_FLIP`、`DeviceUtils`、`DeviceHelper`、`MiuiConfigs`）
+- 排除列表集中在 `Config.identityExcludedPackages`：SystemUI（锁屏面板）、Sogou（键盘高度）、fliphome（启动器初始化）
 - 伪装屏幕类型：`Configuration.getScreenType()` → 0
-- 扫一扫预览方向因应用而异——部分需在打开前以摄像头侧为底
 
 **应用管理**
 - 所有应用白名单注入
@@ -206,18 +256,21 @@ AGPL-3.0
 
 **SystemUI**
 - Widget 覆盖层 4 层禁用
-- SystemUI 侧 widget 隐藏
-- 控制中心样式恢复 — hook 插件 ClassLoader，COMPACT 布局 → VERTICAL，恢复 QS tile 长按，修复设备中心卡片（v2.7）
-- 通知菜单修复
+- 控制中心样式恢复 — hook 插件 ClassLoader，COMPACT 布局 → VERTICAL，恢复 QS tile 长按，修复设备中心卡片
+- 通知菜单修复 — `isTinyScreen` 由 LockScreenHook 全局处理
 - 外屏状态栏时钟隐藏
 - 通知图标扩展到 8 个
-- 最近任务长按菜单 — 外屏最近任务长按弹出锁定/解锁 + 应用信息（v2.7）
-- 系统手势（返回） — 禁用 fliphome FlipLauncher，保留 GestureStubView 边缘返回
-- 系统手势（Home/Recents） — 修复 miuihome NavStubView 三道门控：折叠移除、hideGestureLine、默认桌面检查
-- 折叠状态下外屏 AOD 启用（v2.3 — 屏幕状态修复）
-- 前置摄像头重定向到主后摄（v2 — 动态 LENS_FACING 枚举）
+- 最近任务长按菜单 — 外屏最近任务长按弹出锁定/解锁 + 应用信息
+- 系统手势（返回） — fliphome 原生 InputMonitor 处理滑动
+- 折叠状态下外屏 AOD 启用（v2.3：屏幕状态修复 + FlipLinkageStyleController）
 - 外屏双击休眠 + 三指截屏手势（displayId 修复适配 state=6）
 - 功能开关 — 基于 SystemProperties，重启生效，无界面
+
+**v2.9 变更**
+- 移除 miuihome hooks（LauncherHook, LauncherDensityHook, hookNavigationBar）：HyperOS 4 用 Rust+Flutter 重写 miuihome — hook 目标消失。fliphome 现在是外屏活动启动器，使用原生 InputMonitor
+- 移除侧边手势持久化 hack：fliphome 原生手势生命周期已不需要
+- Config 耦合强制化：`gestureBack` getter 包含 `gestureHome`；`displayAod` 包含 `displayDual`。不再只是 log warn — 关闭前置开关自动关闭依赖功能
+- 排除列表集中在 Config.kt：`identityExcludedPackages`、`cutoutExcludedPackages` — 不再每个文件硬编码
 
 ### 功能开关
 
@@ -240,17 +293,36 @@ reboot
 |------|------|------|
 | `persist.flipunlock.enable` | true | **总开关** — false 则全部关闭 |
 | `persist.flipunlock.display.dual` | true | 双屏显示（DisplayStateHook：强制 state=6，display enable） |
-| `persist.flipunlock.display.aod` | true | 外屏 AOD |
-| `persist.flipunlock.display.cutout` | true | 去除挖孔 + letterbox + appBounds + lifecycle |
-| `persist.flipunlock.gesture.home` | true | 底部手势 Home/Recents（LauncherHook） |
-| `persist.flipunlock.gesture.back` | true | 返回手势（GestureHook：禁用 FlipLauncher） |
+| `persist.flipunlock.display.aod` | true | 外屏 AOD（依赖 display.dual — getter 强制检查） |
+| `persist.flipunlock.display.cutout` | true | 去除挖孔 + letterbox + appBounds + 帧修正 |
+| `persist.flipunlock.gesture.home` | true | Home 手势（fliphome InputMonitor） |
+| `persist.flipunlock.gesture.back` | true | 返回手势（GestureStubView，依赖 gesture.home） |
 | `persist.flipunlock.ui.lockscreen` | true | 锁屏大屏样式（LockScreenHook） |
 | `persist.flipunlock.ui.widget` | true | 禁用外屏小部件（WatchOverlayHook） |
 | `persist.flipunlock.ui.controlcenter` | true | 控制中心样式恢复（ControlCenterHook） |
 | `persist.flipunlock.ui.recentsmenu` | true | 最近任务长按菜单（RecentsMenuHook） |
 | `persist.flipunlock.ime` | true | 输入法自由切换（InputMethodHook + Sogou） |
 
-**耦合**：`gesture.home` 与 `gesture.back` 建议保持同开同关。`display.aod` 依赖 `display.dual`。模块启动时若有冲突会打印 `⚠` 警告。`display.cutout`、`ui.widget`、`ui.controlcenter`、`ui.recentsmenu`、`ime` 均独立。
+### Hook 架构
+
+代码按**功能目录**组织——每个目录对应一个 setprop 开关：
+
+```
+hook/
+├── identity/    无开关 — 始终运行 (DeviceIdentityHook, ScreenTypeHook)
+├── display/     display.dual (DisplayStateHook)
+├── cutout/      display.cutout (CutoutHook, GlobalCutoutHook, AppBoundsHook, LetterboxHook, ActivityLifecycleHook)
+├── aod/         display.aod (AodHook)
+├── gesture/     gesture.home + gesture.back (GestureHook)
+├── lockscreen/  ui.lockscreen (LockScreenHook)
+├── systemui/    状态栏始终运行 + ui.controlcenter (SystemUIHook, ControlCenterHook)
+├── widget/      ui.widget (WatchOverlayHook)
+├── recents/     ui.recentsmenu (RecentsMenuHook)
+├── ime/         ime (InputMethodHook, SogouInputHook)
+├── applaunch/   无开关 — 始终运行 (CompatConfigHook, InterceptHook, WhitelistHook, SubScreenGestureHook, SystemServicesHook)
+├── camera/      已禁用 — 硬件限制 (CameraHook)
+└── util/        Config, HookUtils, ReflectUtils
+```
 
 ### 要求
 
@@ -280,6 +352,8 @@ CI: GitHub Secrets → `KEYSTORE`(base64), `KEYSTORE_PASSWORD`, `ALIAS`, `KEY_PA
 
 - [MixFlipMod](https://github.com/parallelcc/MixFlipMod) by Parallelc — LSPosed 架构、SogouHook、DexKit、SystemUI hook 及工具类参考
 - `refMD/cleaned/` — MIUI 框架及 fliphome 反编译参考文档
+- `COUPLING_REVIEW.md` — 完整耦合/内聚审查 (2026-07-26)
+- `REFACTOR_PLAN.md` — 重构方案与 agent 调用链分析
 
 ### 未完成
 
