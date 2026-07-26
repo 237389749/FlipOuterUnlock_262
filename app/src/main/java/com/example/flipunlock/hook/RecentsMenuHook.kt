@@ -57,17 +57,45 @@ object RecentsMenuHook : BaseHook() {
     )
 
     override fun setupHooks(param: PackageReadyParam) {
+        log("RecentsMenuHook: loading for ${param.packageName}")
+
+        // Gate 7 for fliphome: prevent display-ID-based task filtering.
+        // fliphome's RecentsModel.removeOtherDisplayTask() removes tasks
+        // whose display ID doesn't match this.mDisplay.getDisplayId().
+        // In state=6 (DUAL, outer=displayId=0), this can remove ALL tasks
+        // if they report a different display ID. Runs unconditionally —
+        // no toggle needed, it's a correctness fix not a feature.
+        hookRemoveOtherDisplayTask(param)
+
         if (!Config.uiRecentsMenu) {
             log("RecentsMenuHook: DISABLED by persist.flipunlock.ui.recentsmenu")
             return
         }
-        log("RecentsMenuHook: loading for ${param.packageName}")
         safeHook("RecentsMenu") {
             hookTaskViewLongPress(param)
             hookTaskViewDetach(param)
             hookTaskStackVisibility(param)
             hookRecentsBackPress(param)
         }
+    }
+
+    // ── Gate 7: prevent display-ID task filtering in fliphome ──────────
+    //
+    // Same issue as miuihome's Gate 7: RecentsModel.removeOtherDisplayTask()
+    // compares this.mDisplay.getDisplayId() against each task's display ID
+    // and removes mismatches. In state=6, the outer screen becomes display 0
+    // but tasks may carry different display IDs → all tasks removed.
+
+    private fun hookRemoveOtherDisplayTask(param: PackageReadyParam) {
+        runCatching {
+            val cls = param.classLoader.loadClass(
+                "com.miui.fliphome.recents.RecentsModel")
+            val method = cls.getDeclaredMethod("removeOtherDisplayTask",
+                java.util.List::class.java)
+            method.isAccessible = true
+            hook(method) { null }  // no-op: don't filter by display ID
+            log("RecentsMenu: removeOtherDisplayTask → no-op (fliphome Gate 7)")
+        }.onFailure { log("RecentsMenu: removeOtherDisplayTask failed", it) }
     }
 
     // ── TaskView long-press entry point ──────────────────────────────────
