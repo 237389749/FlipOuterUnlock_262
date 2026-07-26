@@ -213,6 +213,7 @@ For CI, add GitHub Secrets: `KEYSTORE` (base64), `KEYSTORE_PASSWORD`, `ALIAS`, `
 
 ### TODO
 
+- **miuihome gestures** (v2.9: hooks removed) — miuihome and fliphome use completely different gesture architectures. Hook-based attempts (Gates 1–8, LauncherHook) achieved partial results: side/back gestures work via edge overlay injection, bottom swipe-to-home works (returns to desktop), but bottom swipe-to-recents shows empty task list, and system haptic feedback on bottom gestures never fires. The recents animation pipeline (Shell/WindowTransition) is fundamentally broken on the flip outer screen — callbacks never arrive, timeouts produce no action. fliphome's native InputMonitor("swipe-up") was chosen as the primary gesture path instead. Full call-chain analysis preserved in refMD §6 and §13.
 - **CameraHook** — Front camera redirect on outer screen (not working — HAL reports all cameras as LENS_FACING_BACK, fallback "1"→"0" not yet verified)
 - **FaceUnlock** — Face unlock on outer screen (confirmed infeasible — see below)
 - **Toast/hint left-shift** — `Toast.makeText()` hints appear shifted left on outer screen (custom in-app views are centered correctly). Root cause: TYPE_TOAST windows are clipped by the cutout safe area during WindowLayout.computeFrames() in system_server. Multiple hook points tried (InsetsState.getDisplayCutoutSafe, getLayoutInDisplayCutoutMode, computeFrames output fix) without success — the frames may be narrowed upstream of computeFrames, or MIUI has an additional clipping layer not yet identified. Present since initial release.
@@ -357,6 +358,7 @@ CI: GitHub Secrets → `KEYSTORE`(base64), `KEYSTORE_PASSWORD`, `ALIAS`, `KEY_PA
 
 ### 未完成
 
+- **miuihome 手势**（v2.9：hooks 已移除）—— miuihome 与 fliphome 使用完全不同的手势架构。基于 hook 的尝试（Gates 1–8，LauncherHook）取得了部分效果：左右返回手势可通过边缘覆盖层注入实现，底部上滑回桌面可用，但底部上滑进入最近任务显示空白列表，且系统震动反馈在底部手势上从未触发。最近任务动画管线（Shell/WindowTransition）在 flip 外屏上根本性损坏——回调永不触发，超时只重置状态不执行操作。最终选择 fliphome 原生 InputMonitor("swipe-up") 作为主手势方案。完整调用链分析保留在 refMD §6 和 §13。
 - **CameraHook** — 外屏前置摄像头重定向（不生效 — HAL 上报所有摄像头均为 LENS_FACING_BACK，回退方案 "1"→"0" 未验证）
 - **FaceUnlock** — 外屏人脸解锁（已确认不可行 — 详见下）
 - **Toast/提示左移** — `Toast.makeText()` 类提示在外屏偏左（自定义 View 类提示正常居中）。根因：TYPE_TOAST 窗口在 system_server 的 WindowLayout.computeFrames() 中被 cutout 安全区削窄。已尝试 InsetsState.getDisplayCutoutSafe、getLayoutInDisplayCutoutMode、computeFrames 输出修正等多层 hook，均未生效——帧可能在 computeFrames 上游即已被削窄，或 MIUI 存在额外的裁剪层。从初始版本即存在。
