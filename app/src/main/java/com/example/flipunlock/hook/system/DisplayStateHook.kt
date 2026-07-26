@@ -38,7 +38,7 @@ object DisplayStateHook {
         safeHook("DisplayStateHook") {
             hookDisplayToClosed(param)
             hookDisplayLayoutGet(param)
-            hookAppLayerToUnfolded(param)
+//            hookAppLayerToUnfolded(param)  // DISABLED: getHomeIntent crash; use CompatConfig+Intercept+Whitelist instead
             hookDisplayInfoForStateToClosed(param)
             hookDisplayEnabledLocked(param)
             hookExternalDisplayDisable(param)
@@ -175,12 +175,15 @@ object DisplayStateHook {
         }.onFailure { log("DisplayState: failed hook DeviceStateToLayoutMap.get", it) }
     }
 
-    // ── 2. App layer: force unfolded + route launcher to fliphome ──────
-    // onDeviceStateChanged(false) → force unfolded → disable flip restrictions.
-    // Side effect: system uses CATEGORY_HOME (miuihome). Fix: also hook
-    // getHomeIntent() to route to fliphome on outer screen.
+    // ── 2. [DISABLED] App layer force unfolded ──────────────────────────
+    // WAS: ContinuityPolicyService.onDeviceStateChanged(false) → force unfolded.
+    // WHY DISABLED: side effect → CATEGORY_HOME (miuihome) instead of
+    // CATEGORY_SECONDARY_HOME (fliphome) on outer screen.
+    // App restrictions covered by CompatConfigHook + InterceptHook + WhitelistHook.
+    //
+    // getHomeIntent routing to fliphome attempted in c819e37 but caused
+    // system_server crash → device reboot. TODO: find safer hook point.
     private fun hookAppLayerToUnfolded(param: SystemServerStartingParam) {
-        // Force unfolded to disable flip app restrictions
         runCatching {
             val cpsClass = param.classLoader.loadClass(
                 "com.android.server.wm.ContinuityPolicyService"
@@ -196,24 +199,6 @@ object DisplayStateHook {
             }
             log("DisplayState: forced ContinuityPolicyService.onDeviceStateChanged -> unfolded when folded")
         }.onFailure { log("DisplayState: failed hook ContinuityPolicyService", it) }
-
-        // Route HOME intent to fliphome when on outer screen (1208x1392)
-        runCatching {
-            val atmsClass = param.classLoader.loadClass(
-                "com.android.server.wm.ActivityTaskManagerService")
-            val method = atmsClass.method("getHomeIntent")
-            hook(method) { chain ->
-                val intent = chain.proceed() as? android.content.Intent
-                if (intent != null && isOuterScreen()) {
-                    intent.component = android.content.ComponentName(
-                        "com.miui.fliphome", "com.miui.fliphome.FlipLauncher")
-                    intent.addCategory("android.intent.category.SECONDARY_HOME")
-                    log("DisplayState: HOME intent routed to fliphome")
-                }
-                intent ?: chain.proceed()
-            }
-            log("DisplayState: ✓ getHomeIntent → fliphome on outer screen")
-        }.onFailure { log("DisplayState: getHomeIntent hook failed", it) }
     }
 
     // ── 3. DisplayInfo query: always return CLOSED state info ─────────────

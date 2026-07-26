@@ -26,13 +26,13 @@ import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
 object GestureHook : BaseHook() {
     override val targetPackages = listOf("com.miui.fliphome")
 
-    private var launcherDisabled = false
+    private var launcherEnabled = false
 
     override fun setupHooks(param: PackageReadyParam) {
         if (!Config.gestureBack) { log("GestureFix: DISABLED by persist.flipunlock.gesture.back"); return }
         log("GestureFix: setupHooks")
         hookNoStartPage(param)
-//        disableFlipLauncher(param)  // DISABLED: fliphome is now the active launcher
+        ensureFlipLauncherEnabled(param)
 //        hookSideGesturePersistence(param)  // DISABLED: fliphome handles gestures natively when it's the active launcher
     }
 
@@ -142,28 +142,32 @@ object GestureHook : BaseHook() {
         }.onFailure { log("GestureFix: side gesture persistence failed", it) }
     }
 
-    // ── 3. [DISABLED] Disable FlipLauncher component ─────────────────────
-    // WAS: disable FlipLauncher so miuihome could take over as launcher.
-    // WHY DISABLED: fliphome is now the active launcher on outer screen.
-    private fun disableFlipLauncher(param: PackageReadyParam) {
-        if (launcherDisabled) return
+    // ── 3. Ensure FlipLauncher component is ENABLED ────────────────────
+    // Previous versions DISABLED FlipLauncher (miuihome-takeover era).
+    // DONT_KILL_APP means the disabled state persisted across reboots.
+    // Now fliphome is the active launcher — must ENABLE it or fliphome
+    // crashes with NPE in GestureModeApp.<init> (resolveActivity returns null).
+    private fun ensureFlipLauncherEnabled(param: PackageReadyParam) {
+        if (launcherEnabled) return
         runCatching {
             val flipAppClass = param.classLoader.loadClass("com.miui.fliphome.FlipApplication")
             hook(flipAppClass.method("onCreate"), after { chain, result ->
-                if (launcherDisabled) return@after result
+                if (launcherEnabled) return@after result
                 runCatching {
                     val app = chain.thisObject
                     val ctx = app.callMethod("getApplicationContext") as? Context ?: return@runCatching
                     val component = ComponentName("com.miui.fliphome", "com.miui.fliphome.FlipLauncher")
                     val pm = ctx.packageManager
-                    if (pm.getComponentEnabledSetting(component) != PackageManager.COMPONENT_ENABLED_STATE_DISABLED) {
+                    val current = pm.getComponentEnabledSetting(component)
+                    if (current != PackageManager.COMPONENT_ENABLED_STATE_ENABLED &&
+                        current != PackageManager.COMPONENT_ENABLED_STATE_DEFAULT) {
                         pm.setComponentEnabledSetting(component,
-                            PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                            PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
                             PackageManager.DONT_KILL_APP)
-                        launcherDisabled = true
-                        log("GestureFix: disabled FlipLauncher")
+                        log("GestureFix: ENABLED FlipLauncher (was $current)")
                     }
-                }.onFailure { log("GestureFix: disable FlipLauncher err", it) }
+                    launcherEnabled = true
+                }.onFailure { log("GestureFix: enable FlipLauncher err", it) }
                 result
             })
             log("GestureFix: hooked FlipApplication.onCreate")
