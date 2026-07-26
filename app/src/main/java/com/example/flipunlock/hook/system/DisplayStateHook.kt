@@ -38,7 +38,7 @@ object DisplayStateHook {
         safeHook("DisplayStateHook") {
             hookDisplayToClosed(param)
             hookDisplayLayoutGet(param)
-            hookAppLayerToUnfolded(param)
+//            hookAppLayerToUnfolded(param)  // DISABLED: forces unfolded → CATEGORY_HOME → miuihome instead of fliphome
             hookDisplayInfoForStateToClosed(param)
             hookDisplayEnabledLocked(param)
             hookExternalDisplayDisable(param)
