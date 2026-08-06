@@ -1,37 +1,8 @@
 package com.example.flipunlock
 
 import com.example.flipunlock.hook.identity.DeviceIdentityHook
-import com.example.flipunlock.hook.identity.ScreenTypeHook
-import com.example.flipunlock.hook.display.DisplayStateHook
 import com.example.flipunlock.hook.cutout.CutoutHook
 import com.example.flipunlock.hook.cutout.GlobalCutoutHook
-import com.example.flipunlock.hook.cutout.AppBoundsHook
-import com.example.flipunlock.hook.cutout.LetterboxHook
-import com.example.flipunlock.hook.cutout.ActivityLifecycleHook
-import com.example.flipunlock.hook.aod.AodHook
-import com.example.flipunlock.hook.gesture.GestureHook
-import com.example.flipunlock.hook.lockscreen.LockScreenHook
-import com.example.flipunlock.hook.systemui.SystemUIHook
-import com.example.flipunlock.hook.systemui.ControlCenterHook
-import com.example.flipunlock.hook.widget.WatchOverlayHook
-import com.example.flipunlock.hook.recents.DisplayFilterFix
-import com.example.flipunlock.hook.ime.SogouInputHook
-import com.example.flipunlock.hook.ime.InputMethodHook
-import com.example.flipunlock.hook.applaunch.InterceptHook
-import com.example.flipunlock.hook.applaunch.WhitelistHook
-import com.example.flipunlock.hook.applaunch.SubScreenGestureHook
-import com.example.flipunlock.hook.applaunch.SystemServicesHook
-// Split system_server hooks (fine-grained)
-import com.example.flipunlock.hook.system_server.DisplayStateForceClosed
-import com.example.flipunlock.hook.system_server.CutoutModeAlways
-import com.example.flipunlock.hook.system_server.CutoutZero
-import com.example.flipunlock.hook.system_server.FrameExpand
-import com.example.flipunlock.hook.system_server.LetterboxWidthFix
-import com.example.flipunlock.hook.system_server.AodDoze
-import com.example.flipunlock.hook.system_server.InsetsCutoutRemove
-import com.example.flipunlock.hook.system_server.AppBoundsFix
-import com.example.flipunlock.hook.system_server.CompatGravityZero
-import com.example.flipunlock.hook.system_server.FlipCompatDisable
 import com.example.flipunlock.hook.util.log
 import com.example.flipunlock.hook.util.Config
 import io.github.libxposed.api.XposedModule
@@ -44,19 +15,9 @@ internal var module: Main? = null
 class Main : XposedModule() {
 
     private val hooks = listOf(
-        // ScreenTypeHook,  // [ROUND4 tested - not sufficient alone]
-        DeviceIdentityHook,  // [ROUND5] testing alone
-        GlobalCutoutHook,  // [RE-ENABLED] cutout removal
-        // AodHook,  // [DISABLED for toast-debug]
-        // ControlCenterHook,  // [DISABLED for toast-debug]
-        CutoutHook,  // [RE-ENABLED] cutout removal
-        // SystemUIHook,  // [ROUND8 DISABLED]
-        // GestureHook,  // [DISABLED] block registerInputConsumer + ensureFlipLauncherEnabled
-        // LockScreenHook,  // [DISABLED for toast-debug] fix lock screen
-        // DisplayFilterFix,  // [DISABLED for toast-debug] Gate 7: prevent display-ID filtering
-        // SogouInputHook,  // [DISABLED for toast-debug]
-        // ActivityLifecycleHook,  // [DISABLED for toast-debug]
-        // WatchOverlayHook,  // [DISABLED for toast-debug]
+        DeviceIdentityHook,  // toast 居中 (ROOT: isFlipDevice → false)
+        GlobalCutoutHook,    // cutout 去除
+        CutoutHook,          // cutout 去除
     )
 
     override fun onModuleLoaded(param: ModuleLoadedParam) {
@@ -66,25 +27,7 @@ class Main : XposedModule() {
 
     override fun onSystemServerStarting(param: SystemServerStartingParam) {
         log("Main: onSystemServerStarting — loading system hooks")
-        CutoutHook.hookFramework(param)  // [RE-ENABLED] cutout removal framework-side
-        // LetterboxHook.hook(param)  // [DISABLED for toast-debug]
-        // WhitelistHook.hook(param)  // [DISABLED] not cutout/display
-        // SubScreenGestureHook.hook(param)  // [DISABLED for toast-debug]
-        // ── Split from DisplayStateHook ──
-        // DisplayStateForceClosed.hook(param)  // state=0 CLOSED + DUAL layout
-        // CutoutModeAlways.hook(param)         // system_server ALWAYS cutout mode
-        // CutoutZero.hook(param)               // calculateDisplayCutoutForRotation → NO_CUTOUT
-        // FrameExpand.hook(param)              // computeFrames parentFrame right expand
-        // LetterboxWidthFix.hook(param)        // letterboxFullBounds width clamp
-        // AodDoze.hook(param)                  // AOD outer screen doze settings
-        // ── Split from AppBoundsHook ──
-        // InsetsCutoutRemove.hook(param)       // InsetsState remove display cutout
-        // AppBoundsFix.hook(param)             // appBounds fix (cold start + config change)
-        // ── Split from SystemServicesHook ──
-        // CompatGravityZero.hook(param)        // getCompatGravity → 0
-        // FlipCompatDisable.hook(param)        // flip compat mode + fullscreen → 0
-        // InputMethodHook.hook(param)  // [DISABLED] not cutout/display
-        // InterceptHook.hook(param)  // [DISABLED] not cutout/display
+        CutoutHook.hookFramework(param)  // cutout 去除 (框架侧)
     }
 
     override fun onPackageReady(param: PackageReadyParam) {
