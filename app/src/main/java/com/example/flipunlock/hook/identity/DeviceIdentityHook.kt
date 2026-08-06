@@ -38,13 +38,13 @@ object DeviceIdentityHook : BaseHook() {
 
         log("DeviceIdentityHook: loading for ${param.packageName}")
         safeHook("DeviceIdentityHook") {
-            hookRootDeviceType(param)       // MiuiMultiDisplayTypeInfo
-            hookMiuiBuild(param)            // miui.os.Build
-            hookMiuixBuildStatic(param)     // miuix.os.Build.IS_FLIP
-            hookDeviceUtils(param)          // miuix.device.DeviceUtils
-            // hookDeviceHelper(param)      // [ROUND6 DISABLED] isTinyScreen/detectType
-            // hookMiuiConfigs(param)       // [ROUND6 DISABLED] isFoldableDevice/isTinyScreen
-            // hookDefensiveStatics(param)  // [ROUND6 DISABLED] IS_FOLD/IS_NOTCH/IS_PAD
+            hookRootDeviceType(param)       // MiuiMultiDisplayTypeInfo — ROOT
+            // hookMiuiBuild(param)         // [ROUND7 DISABLED] delegates to root
+            // hookMiuixBuildStatic(param)  // [ROUND7 DISABLED] downstream of root
+            // hookDeviceUtils(param)       // [ROUND7 DISABLED] delegates to root
+            // hookDeviceHelper(param)      // [ROUND6 DISABLED]
+            // hookMiuiConfigs(param)       // [ROUND6 DISABLED]
+            // hookDefensiveStatics(param)  // [ROUND6 DISABLED]
         }
     }
 
