@@ -21,6 +21,17 @@ import com.example.flipunlock.hook.applaunch.InterceptHook
 import com.example.flipunlock.hook.applaunch.WhitelistHook
 import com.example.flipunlock.hook.applaunch.SubScreenGestureHook
 import com.example.flipunlock.hook.applaunch.SystemServicesHook
+// Split system_server hooks (fine-grained)
+import com.example.flipunlock.hook.system_server.DisplayStateForceClosed
+import com.example.flipunlock.hook.system_server.CutoutModeAlways
+import com.example.flipunlock.hook.system_server.CutoutZero
+import com.example.flipunlock.hook.system_server.FrameExpand
+import com.example.flipunlock.hook.system_server.LetterboxWidthFix
+import com.example.flipunlock.hook.system_server.AodDoze
+import com.example.flipunlock.hook.system_server.InsetsCutoutRemove
+import com.example.flipunlock.hook.system_server.AppBoundsFix
+import com.example.flipunlock.hook.system_server.CompatGravityZero
+import com.example.flipunlock.hook.system_server.FlipCompatDisable
 import com.example.flipunlock.hook.util.log
 import com.example.flipunlock.hook.util.Config
 import io.github.libxposed.api.XposedModule
@@ -59,9 +70,19 @@ class Main : XposedModule() {
         // LetterboxHook.hook(param)  // [DISABLED for toast-debug]
         // WhitelistHook.hook(param)  // [DISABLED] not cutout/display
         // SubScreenGestureHook.hook(param)  // [DISABLED for toast-debug]
-        // DisplayStateHook.hook(param)  // [ROUND9 DISABLED]
-        // AppBoundsHook.hook(param)  // [ROUND9 DISABLED]
-        // SystemServicesHook.hook(param)  // [ROUND9 DISABLED]
+        // ── Split from DisplayStateHook ──
+        // DisplayStateForceClosed.hook(param)  // state=0 CLOSED + DUAL layout
+        // CutoutModeAlways.hook(param)         // system_server ALWAYS cutout mode
+        // CutoutZero.hook(param)               // calculateDisplayCutoutForRotation → NO_CUTOUT
+        // FrameExpand.hook(param)              // computeFrames parentFrame right expand
+        // LetterboxWidthFix.hook(param)        // letterboxFullBounds width clamp
+        // AodDoze.hook(param)                  // AOD outer screen doze settings
+        // ── Split from AppBoundsHook ──
+        // InsetsCutoutRemove.hook(param)       // InsetsState remove display cutout
+        // AppBoundsFix.hook(param)             // appBounds fix (cold start + config change)
+        // ── Split from SystemServicesHook ──
+        // CompatGravityZero.hook(param)        // getCompatGravity → 0
+        // FlipCompatDisable.hook(param)        // flip compat mode + fullscreen → 0
         // InputMethodHook.hook(param)  // [DISABLED] not cutout/display
         // InterceptHook.hook(param)  // [DISABLED] not cutout/display
     }
