@@ -33,8 +33,8 @@ internal var module: Main? = null
 class Main : XposedModule() {
 
     private val hooks = listOf(
-        ScreenTypeHook,  // [ROUND4] testing alone
-        // DeviceIdentityHook,  // [ROUND4 DISABLED] testing ScreenType alone
+        // ScreenTypeHook,  // [ROUND4 tested - not sufficient alone]
+        DeviceIdentityHook,  // [ROUND5] testing alone
         // GlobalCutoutHook,  // [ROUND2 tested - not the key]
         // AodHook,  // [DISABLED for toast-debug]
         // ControlCenterHook,  // [DISABLED for toast-debug]
