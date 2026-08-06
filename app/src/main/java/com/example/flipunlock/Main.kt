@@ -57,13 +57,13 @@ class Main : XposedModule() {
         log("Main: onSystemServerStarting — loading system hooks")
         CutoutHook.hookFramework(param)
         // LetterboxHook.hook(param)  // [DISABLED for toast-debug]
-        WhitelistHook.hook(param)
+        // WhitelistHook.hook(param)  // [DISABLED] not cutout/display
         // SubScreenGestureHook.hook(param)  // [DISABLED for toast-debug]
         DisplayStateHook.hook(param)
         AppBoundsHook.hook(param)
         SystemServicesHook.hook(param)
-        InputMethodHook.hook(param)
-        InterceptHook.hook(param)
+        // InputMethodHook.hook(param)  // [DISABLED] not cutout/display
+        // InterceptHook.hook(param)  // [DISABLED] not cutout/display
     }
 
     override fun onPackageReady(param: PackageReadyParam) {
