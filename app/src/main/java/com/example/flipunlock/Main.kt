@@ -33,11 +33,11 @@ internal var module: Main? = null
 class Main : XposedModule() {
 
     private val hooks = listOf(
-        ScreenTypeHook,  // Configuration.getScreenType → 0
-        DeviceIdentityHook,  // IS_FLIP / isFlipDevice / isFoldDevice → false
-        GlobalCutoutHook,  // Display.getCutout + WindowInsets.getDisplayCutout → zero (all apps)
-        // AodHook,  // [DISABLED for toast-debug] v2.3: screen state fix + FlipLinkageStyleController
-        // ControlCenterHook,  // [DISABLED for toast-debug] v2.7: restore normal control center style
+        // ScreenTypeHook,  // [ROUND1 DISABLED] Configuration.getScreenType → 0
+        // DeviceIdentityHook,  // [ROUND1 DISABLED] IS_FLIP / isFlipDevice / isFoldDevice → false
+        // GlobalCutoutHook,  // [ROUND1 DISABLED] Display.getCutout + WindowInsets.getDisplayCutout → zero
+        // AodHook,  // [DISABLED for toast-debug]
+        // ControlCenterHook,  // [DISABLED for toast-debug]
         CutoutHook,
         SystemUIHook,
         // GestureHook,  // [DISABLED for toast-debug] v2: block fliphome InputMonitor
