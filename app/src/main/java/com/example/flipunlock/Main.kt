@@ -16,7 +16,7 @@ class Main : XposedModule() {
 
     private val hooks = listOf(
         DeviceIdentityHook,  // toast 居中 (ROOT: isFlipDevice → false)
-        GlobalCutoutHook,    // cutout 去除
+        // GlobalCutoutHook,    // [TEST DISABLED] cutout 去除
         CutoutHook,          // cutout 去除
     )
 
