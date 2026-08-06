@@ -59,9 +59,9 @@ class Main : XposedModule() {
         // LetterboxHook.hook(param)  // [DISABLED for toast-debug]
         // WhitelistHook.hook(param)  // [DISABLED] not cutout/display
         // SubScreenGestureHook.hook(param)  // [DISABLED for toast-debug]
-        DisplayStateHook.hook(param)
-        AppBoundsHook.hook(param)
-        SystemServicesHook.hook(param)
+        // DisplayStateHook.hook(param)  // [ROUND9 DISABLED]
+        // AppBoundsHook.hook(param)  // [ROUND9 DISABLED]
+        // SystemServicesHook.hook(param)  // [ROUND9 DISABLED]
         // InputMethodHook.hook(param)  // [DISABLED] not cutout/display
         // InterceptHook.hook(param)  // [DISABLED] not cutout/display
     }
