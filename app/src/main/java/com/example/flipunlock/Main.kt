@@ -17,7 +17,7 @@ class Main : XposedModule() {
     private val hooks = listOf(
         DeviceIdentityHook,  // toast 居中 (ROOT: isFlipDevice → false)
         // GlobalCutoutHook,    // [TEST DISABLED] cutout 去除
-        // CutoutHook,          // [TEST DISABLED] cutout 去除
+        CutoutHook,          // cutout 去除
     )
 
     override fun onModuleLoaded(param: ModuleLoadedParam) {
@@ -38,10 +38,6 @@ class Main : XposedModule() {
 
             if (!isWildcard && !isTargeted) return@forEach
 
-            // "*" hooks use the first package's classloader (framework classes).
-            // Skip for subsequent packages to avoid duplicate hooking.
-            // Exception: DeviceIdentityHook needs per-package exclusion for
-            // SystemUI, Sogou, and fliphome (need real isFlipDevice).
             if (isWildcard && !param.isFirstPackage && hook !is DeviceIdentityHook) return@forEach
 
             log("Main: loading ${hook.javaClass.simpleName} for ${param.packageName}")
