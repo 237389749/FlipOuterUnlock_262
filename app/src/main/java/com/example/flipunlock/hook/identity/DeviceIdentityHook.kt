@@ -42,9 +42,9 @@ object DeviceIdentityHook : BaseHook() {
             hookMiuiBuild(param)            // miui.os.Build
             hookMiuixBuildStatic(param)     // miuix.os.Build.IS_FLIP
             hookDeviceUtils(param)          // miuix.device.DeviceUtils
-            hookDeviceHelper(param)         // miuix.os.DeviceHelper
-            hookMiuiConfigs(param)          // miui.util.MiuiConfigs
-            hookDefensiveStatics(param)     // IS_FOLD, IS_NOTCH, IS_FOLDABLE (point.txt #5)
+            // hookDeviceHelper(param)      // [ROUND6 DISABLED] isTinyScreen/detectType
+            // hookMiuiConfigs(param)       // [ROUND6 DISABLED] isFoldableDevice/isTinyScreen
+            // hookDefensiveStatics(param)  // [ROUND6 DISABLED] IS_FOLD/IS_NOTCH/IS_PAD
         }
     }
 
