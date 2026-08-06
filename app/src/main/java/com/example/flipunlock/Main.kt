@@ -51,7 +51,7 @@ class Main : XposedModule() {
         // ControlCenterHook,  // [DISABLED for toast-debug]
         CutoutHook,  // [RE-ENABLED] cutout removal
         // SystemUIHook,  // [ROUND8 DISABLED]
-        GestureHook,  // [RE-ENABLED] block registerInputConsumer + ensureFlipLauncherEnabled
+        // GestureHook,  // [DISABLED] block registerInputConsumer + ensureFlipLauncherEnabled
         // LockScreenHook,  // [DISABLED for toast-debug] fix lock screen
         // DisplayFilterFix,  // [DISABLED for toast-debug] Gate 7: prevent display-ID filtering
         // SogouInputHook,  // [DISABLED for toast-debug]
