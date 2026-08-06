@@ -38,8 +38,8 @@ class Main : XposedModule() {
         // GlobalCutoutHook,  // [ROUND2 tested - not the key]
         // AodHook,  // [DISABLED for toast-debug]
         // ControlCenterHook,  // [DISABLED for toast-debug]
-        CutoutHook,
-        SystemUIHook,
+        // CutoutHook,  // [ROUND8 DISABLED] testing DeviceIdentity + system_server only
+        // SystemUIHook,  // [ROUND8 DISABLED]
         // GestureHook,  // [DISABLED for toast-debug] v2: block fliphome InputMonitor
         // LockScreenHook,  // [DISABLED for toast-debug] fix lock screen
         // DisplayFilterFix,  // [DISABLED for toast-debug] Gate 7: prevent display-ID filtering
@@ -55,7 +55,7 @@ class Main : XposedModule() {
 
     override fun onSystemServerStarting(param: SystemServerStartingParam) {
         log("Main: onSystemServerStarting — loading system hooks")
-        CutoutHook.hookFramework(param)
+        // CutoutHook.hookFramework(param)  // [ROUND8 DISABLED]
         // LetterboxHook.hook(param)  // [DISABLED for toast-debug]
         // WhitelistHook.hook(param)  // [DISABLED] not cutout/display
         // SubScreenGestureHook.hook(param)  // [DISABLED for toast-debug]
