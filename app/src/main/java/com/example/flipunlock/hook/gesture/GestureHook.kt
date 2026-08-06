@@ -30,10 +30,10 @@ object GestureHook : BaseHook() {
     private var launcherEnabled = false
 
     override fun setupHooks(param: PackageReadyParam) {
-        if (!Config.gestureBack) { log("GestureFix: DISABLED by persist.flipunlock.gesture.back"); return }
         log("GestureFix: setupHooks")
         hookNoStartPage(param)
         ensureFlipLauncherEnabled(param)
+        blockRegisterInputConsumer(param)  // prevent SecurityException crash
     }
 
     // ── 1. No start page (ported from MixFlipMod) ────────────────────────
@@ -47,7 +47,25 @@ object GestureHook : BaseHook() {
         }.onFailure { log("GestureFix: PerformLaunchAction not found", it) }
     }
 
-    // ── 2. Ensure FlipLauncher component is ENABLED ────────────────────
+    // ── 3. Block registerInputConsumer to prevent SecurityException crash ──
+    // fliphome calls IWindowManager.createInputConsumer which requires INPUT_CONSUMER
+    // permission that fliphome doesn't have → SecurityException → crash → black screen.
+    // Fix: hook GestureInputHelper.registerInputConsumer() to return immediately.
+    private fun blockRegisterInputConsumer(param: PackageReadyParam) {
+        runCatching {
+            val cls = param.classLoader.loadClass(
+                "com.miui.fliphome.gesture.GestureInputHelper")
+            val method = cls.getDeclaredMethod("registerInputConsumer")
+            method.isAccessible = true
+            hook(method) {
+                log("GestureFix: BLOCKED registerInputConsumer")
+                null
+            }
+            log("GestureFix: blockRegisterInputConsumer installed")
+        }.onFailure { log("GestureFix: blockRegisterInputConsumer failed", it) }
+    }
+
+    // ── 4. Ensure FlipLauncher component is ENABLED ────────────────────
     // Previous versions DISABLED FlipLauncher (miuihome-takeover era).
     // DONT_KILL_APP means the disabled state persisted across reboots.
     // Now fliphome is the active launcher — must ENABLE it or fliphome
