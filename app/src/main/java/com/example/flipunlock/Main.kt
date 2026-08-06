@@ -35,7 +35,7 @@ class Main : XposedModule() {
     private val hooks = listOf(
         // ScreenTypeHook,  // [ROUND1 DISABLED] Configuration.getScreenType → 0
         // DeviceIdentityHook,  // [ROUND1 DISABLED] IS_FLIP / isFlipDevice / isFoldDevice → false
-        // GlobalCutoutHook,  // [ROUND1 DISABLED] Display.getCutout + WindowInsets.getDisplayCutout → zero
+        GlobalCutoutHook,  // [ROUND2 RE-ENABLED] Display.getCutout + WindowInsets.getDisplayCutout → zero
         // AodHook,  // [DISABLED for toast-debug]
         // ControlCenterHook,  // [DISABLED for toast-debug]
         CutoutHook,
