@@ -46,10 +46,10 @@ class Main : XposedModule() {
     private val hooks = listOf(
         // ScreenTypeHook,  // [ROUND4 tested - not sufficient alone]
         DeviceIdentityHook,  // [ROUND5] testing alone
-        // GlobalCutoutHook,  // [ROUND2 tested - not the key]
+        GlobalCutoutHook,  // [RE-ENABLED] cutout removal
         // AodHook,  // [DISABLED for toast-debug]
         // ControlCenterHook,  // [DISABLED for toast-debug]
-        // CutoutHook,  // [ROUND8 DISABLED] testing DeviceIdentity + system_server only
+        CutoutHook,  // [RE-ENABLED] cutout removal
         // SystemUIHook,  // [ROUND8 DISABLED]
         GestureHook,  // [RE-ENABLED] block registerInputConsumer + ensureFlipLauncherEnabled
         // LockScreenHook,  // [DISABLED for toast-debug] fix lock screen
@@ -66,7 +66,7 @@ class Main : XposedModule() {
 
     override fun onSystemServerStarting(param: SystemServerStartingParam) {
         log("Main: onSystemServerStarting — loading system hooks")
-        // CutoutHook.hookFramework(param)  // [ROUND8 DISABLED]
+        CutoutHook.hookFramework(param)  // [RE-ENABLED] cutout removal framework-side
         // LetterboxHook.hook(param)  // [DISABLED for toast-debug]
         // WhitelistHook.hook(param)  // [DISABLED] not cutout/display
         // SubScreenGestureHook.hook(param)  // [DISABLED for toast-debug]
