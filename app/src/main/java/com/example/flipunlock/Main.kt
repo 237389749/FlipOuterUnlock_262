@@ -36,16 +36,16 @@ class Main : XposedModule() {
         ScreenTypeHook,  // Configuration.getScreenType → 0
         DeviceIdentityHook,  // IS_FLIP / isFlipDevice / isFoldDevice → false
         GlobalCutoutHook,  // Display.getCutout + WindowInsets.getDisplayCutout → zero (all apps)
-        AodHook,  // v2.3: screen state fix + FlipLinkageStyleController
-        ControlCenterHook,  // v2.7: restore normal control center style on outer screen
+        // AodHook,  // [DISABLED for toast-debug] v2.3: screen state fix + FlipLinkageStyleController
+        // ControlCenterHook,  // [DISABLED for toast-debug] v2.7: restore normal control center style
         CutoutHook,
         SystemUIHook,
-        GestureHook,  // v2: block fliphome InputMonitor → system gestures
-        LockScreenHook,  // fix lock screen: swipe, shortcuts, wallpaper on outer screen
-        DisplayFilterFix,  // Gate 7: prevent display-ID task filtering in fliphome recents
-        SogouInputHook,
-        ActivityLifecycleHook,
-        WatchOverlayHook,
+        // GestureHook,  // [DISABLED for toast-debug] v2: block fliphome InputMonitor
+        // LockScreenHook,  // [DISABLED for toast-debug] fix lock screen
+        // DisplayFilterFix,  // [DISABLED for toast-debug] Gate 7: prevent display-ID filtering
+        // SogouInputHook,  // [DISABLED for toast-debug]
+        // ActivityLifecycleHook,  // [DISABLED for toast-debug]
+        // WatchOverlayHook,  // [DISABLED for toast-debug]
     )
 
     override fun onModuleLoaded(param: ModuleLoadedParam) {
@@ -56,9 +56,9 @@ class Main : XposedModule() {
     override fun onSystemServerStarting(param: SystemServerStartingParam) {
         log("Main: onSystemServerStarting — loading system hooks")
         CutoutHook.hookFramework(param)
-        LetterboxHook.hook(param)
+        // LetterboxHook.hook(param)  // [DISABLED for toast-debug]
         WhitelistHook.hook(param)
-        SubScreenGestureHook.hook(param)
+        // SubScreenGestureHook.hook(param)  // [DISABLED for toast-debug]
         DisplayStateHook.hook(param)
         AppBoundsHook.hook(param)
         SystemServicesHook.hook(param)
