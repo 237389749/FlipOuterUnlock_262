@@ -30,11 +30,11 @@ object DeviceIdentityHook : BaseHook() {
                 hook(method, replaceResult(false))
                 log("DeviceIdentity: blocked MiuiMultiDisplayTypeInfo.isFlipDevice")
             }
-            runCatching {
-                val method = cls.method("isFoldDevice")
-                hook(method, replaceResult(false))
-                log("DeviceIdentity: blocked MiuiMultiDisplayTypeInfo.isFoldDevice")
-            }
+            // runCatching {
+            //     val method = cls.method("isFoldDevice")
+            //     hook(method, replaceResult(false))
+            //     log("DeviceIdentity: blocked MiuiMultiDisplayTypeInfo.isFoldDevice")
+            // }
         }.onFailure { log("DeviceIdentity: MiuiMultiDisplayTypeInfo not found", it) }
     }
 }

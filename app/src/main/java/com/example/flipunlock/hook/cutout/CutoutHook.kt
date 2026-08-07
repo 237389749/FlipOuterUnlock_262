@@ -12,8 +12,8 @@ import io.github.libxposed.api.XposedModuleInterface.SystemServerStartingParam
 object CutoutHook : BaseHook() {
     override val targetPackages = listOf(
         "com.android.systemui",
-        "com.miui.aod",
-        "com.android.camera",
+        // "com.miui.aod",
+        // "com.android.camera",
     )
 
     fun hookFramework(param: SystemServerStartingParam) {
