@@ -25,7 +25,7 @@ object CutoutHook : BaseHook() {
         safeHook("CutoutHook-framework") {
             hookCutoutParser(param.classLoader)
             hookPathAndDisplayCutoutFromSpec(param.classLoader)
-            hookDisplayFlipFoldedCutout()
+            // DISABLED: hookDisplayFlipFoldedCutout — 排除法测试
         }
     }
 
@@ -34,7 +34,7 @@ object CutoutHook : BaseHook() {
         log("CutoutHook: loading for ${param.packageName}")
         hookCutoutParser(param.classLoader)
         hookPathAndDisplayCutoutFromSpec(param.classLoader)
-        hookDisplayFlipFoldedCutout()
+        // DISABLED: hookDisplayFlipFoldedCutout — 排除法测试
     }
 
     private fun hookCutoutParser(classLoader: ClassLoader) {
