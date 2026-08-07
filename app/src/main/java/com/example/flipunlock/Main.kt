@@ -15,7 +15,7 @@ class Main : XposedModule() {
 
     private val hooks = listOf(
         DeviceIdentityHook,  // toast 居中 (ROOT: isFlipDevice → false)
-        CutoutHook,          // cutout 去除
+        // CutoutHook,       // [DISABLED] 排除法测试
     )
 
     override fun onModuleLoaded(param: ModuleLoadedParam) {
@@ -25,7 +25,7 @@ class Main : XposedModule() {
 
     override fun onSystemServerStarting(param: SystemServerStartingParam) {
         log("Main: onSystemServerStarting — loading system hooks")
-        CutoutHook.hookFramework(param)  // cutout 去除 (框架侧)
+        // CutoutHook.hookFramework(param)  // [DISABLED] 排除法测试
     }
 
     override fun onPackageReady(param: PackageReadyParam) {
