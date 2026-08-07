@@ -24,7 +24,7 @@ object CutoutHook : BaseHook() {
         log("CutoutHook-framework: setting up in system_server")
         safeHook("CutoutHook-framework") {
             hookCutoutParser(param.classLoader)
-            hookPathAndDisplayCutoutFromSpec(param.classLoader)
+            // DISABLED: hookPathAndDisplayCutoutFromSpec — 排除法测试
             // DISABLED: hookDisplayFlipFoldedCutout — 排除法测试
         }
     }
@@ -33,7 +33,7 @@ object CutoutHook : BaseHook() {
         if (!Config.displayCutout) return
         log("CutoutHook: loading for ${param.packageName}")
         hookCutoutParser(param.classLoader)
-        hookPathAndDisplayCutoutFromSpec(param.classLoader)
+        // DISABLED: hookPathAndDisplayCutoutFromSpec — 排除法测试
         // DISABLED: hookDisplayFlipFoldedCutout — 排除法测试
     }
 
