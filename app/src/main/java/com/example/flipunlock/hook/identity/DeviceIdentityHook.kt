@@ -5,82 +5,23 @@ import com.example.flipunlock.hook.BaseHook
 import com.example.flipunlock.hook.util.*
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
 
-/**
- * Hook all device identity detection paths to make the system treat the
- * Mix Flip as a regular phone. Merges the original TinyScreenHook.java
- * (previously unported) + gap analysis from refMD/cleaned docs.
- *
- * Full detection chain (from ref docs):
- *   MiuiMultiDisplayTypeInfo.isFlipDevice()  ← ROOT (persist.sys.multi_display_type == 4)
- *     ├── MiuiConfigs.isFlipTinyScreen()     ← isFlipDevice() && density <= 670
- *     ├── MiuiConfigs.isTinyScreen()         ← density <= 670
- *     ├── MiuiConfigs.isFoldableDevice()     ← IS_FOLD || isFlipDevice()
- *     ├── DeviceUtils.isFlipTinyScreen()     ← isFlipDevice() && screenType == 1
- *     ├── DeviceHelper.isTinyScreen()        ← detectType()==4 && screenType == 1
- *     ├── miui.os.Build.isFlipDevice()       ← delegates to MiuiMultiDisplayTypeInfo
- *     └── miuix.os.Build.IS_FLIP             ← static field from same property
- *
- * Targeting all processes so spoofing works everywhere.
- */
 object DeviceIdentityHook : BaseHook() {
     override val targetPackages = listOf("*")
 
     @Volatile private var hooksInstalled = false
 
     override fun hook(param: PackageReadyParam) {
-        // Packages that need original flip behavior: lock screen, keyboard height, launcher init.
-        // List centralized in Config.identityExcludedPackages.
         if (param.packageName in Config.identityExcludedPackages) return
 
-        // Install hooks only once (called for every package due to Main.kt wildcard exception)
         if (hooksInstalled) return
         hooksInstalled = true
 
         log("DeviceIdentityHook: loading for ${param.packageName}")
         safeHook("DeviceIdentityHook") {
-            hookRootDeviceType(param)       // MiuiMultiDisplayTypeInfo — ROOT
-            // hookMiuiBuild(param)         // [ROUND7 DISABLED] delegates to root
-            // hookMiuixBuildStatic(param)  // [ROUND7 DISABLED] downstream of root
-            // hookDeviceUtils(param)       // [ROUND7 DISABLED] delegates to root
-            // hookDeviceHelper(param)      // [ROUND6 DISABLED]
-            // hookMiuiConfigs(param)       // [ROUND6 DISABLED]
-            // hookDefensiveStatics(param)  // [ROUND6 DISABLED]
+            hookRootDeviceType(param)
         }
     }
 
-    // ── Defensive: clear other fold/notch static flags (point.txt #5) ─────
-    // These are less critical than isFlipDevice but provide defense-in-depth
-    // against foldable/tablet/notch-specific behavior paths.
-    @Suppress("BanDiscouragedJavaApi")
-    private fun hookDefensiveStatics(param: PackageReadyParam) {
-        clearStaticFinalField(param, "miui.util.MiuiConfigs", "IS_FOLD", false)
-        clearStaticFinalField(param, "miui.util.MiuiConfigs", "IS_NOTCH", false)
-        clearStaticFinalField(param, "miui.util.MiuiConfigs", "IS_PAD", false)
-        clearStaticFinalField(param, "miuix.os.Build", "IS_FOLDABLE", false)
-        // DeviceFeature.IS_FOLD_DEVICE is set at class init from isFoldDevice().
-        // May have been loaded before our hook fires — clear it here for consistency.
-        clearStaticFinalField(param, "miui.os.DeviceFeature", "IS_FOLD_DEVICE", false)
-    }
-
-    private fun clearStaticFinalField(param: PackageReadyParam, className: String, fieldName: String, value: Boolean) {
-        runCatching {
-            val cls = param.classLoader.loadClass(className)
-            val field = cls.field(fieldName)
-            field.isAccessible = true
-            runCatching {
-                val modifiersField = java.lang.reflect.Field::class.java.getDeclaredField("modifiers")
-                modifiersField.isAccessible = true
-                modifiersField.setInt(field, field.modifiers and 0xFFFFFFEF.toInt())
-            }
-            field.setBoolean(null, value)
-            log("DeviceIdentity: set $className.$fieldName = $value")
-        }.onFailure { /* class or field may not exist */ }
-    }
-
-    // ── ROOT: MiuiMultiDisplayTypeInfo.isFlipDevice() ────────────────────
-    // The single source of truth. Returns true when persist.sys.multi_display_type == 4.
-    // If we block this, all downstream detection paths that delegate to it
-    // (miui.os.Build, DeviceUtils) also return false.
     private fun hookRootDeviceType(param: PackageReadyParam) {
         runCatching {
             val cls = param.classLoader.loadClass("miui.util.MiuiMultiDisplayTypeInfo")
@@ -89,106 +30,11 @@ object DeviceIdentityHook : BaseHook() {
                 hook(method, replaceResult(false))
                 log("DeviceIdentity: blocked MiuiMultiDisplayTypeInfo.isFlipDevice")
             }
-            // Also hook isFoldDevice to prevent fold-specific behaviors
             runCatching {
                 val method = cls.method("isFoldDevice")
                 hook(method, replaceResult(false))
                 log("DeviceIdentity: blocked MiuiMultiDisplayTypeInfo.isFoldDevice")
             }
         }.onFailure { log("DeviceIdentity: MiuiMultiDisplayTypeInfo not found", it) }
-    }
-
-    // ── miui.os.Build.isFlipDevice() ─────────────────────────────────────
-    // From original TinyScreenHook.java: delegates to MiuiMultiDisplayTypeInfo
-    private fun hookMiuiBuild(param: PackageReadyParam) {
-        runCatching {
-            val cls = param.classLoader.loadClass("miui.os.Build")
-            runCatching {
-                val method = cls.method("isFlipDevice")
-                hook(method, replaceResult(false))
-                log("DeviceIdentity: blocked miui.os.Build.isFlipDevice")
-            }
-        }.onFailure { log("DeviceIdentity: miui.os.Build not found", it) }
-    }
-
-    // ── miuix.os.Build.IS_FLIP (static final field) ──────────────────────
-    // From original TinyScreenHook.java: set via reflection.
-    // This is a static final field initialized from persist.sys.multi_display_type.
-    // Not a compile-time constant, so reflection set will work.
-    @Suppress("BanDiscouragedJavaApi")
-    private fun hookMiuixBuildStatic(param: PackageReadyParam) {
-        runCatching {
-            val cls = param.classLoader.loadClass("miuix.os.Build")
-            val field = cls.field("IS_FLIP")
-            field.isAccessible = true
-            // Remove final modifier via reflection on Field.modifiers
-            runCatching {
-                val modifiersField = java.lang.reflect.Field::class.java.getDeclaredField("modifiers")
-                modifiersField.isAccessible = true
-                modifiersField.setInt(field, field.modifiers and 0xFFFFFFEF.toInt()) // clear ACC_FINAL
-            }
-            field.setBoolean(null, false)
-            log("DeviceIdentity: set miuix.os.Build.IS_FLIP = false")
-        }.onFailure { log("DeviceIdentity: miuix.os.Build not found", it) }
-    }
-
-    // ── DeviceUtils.isFlipTinyScreen / isFlipDevice (miuix.device) ─────
-    private fun hookDeviceUtils(param: PackageReadyParam) {
-        runCatching {
-            val cls = param.classLoader.loadClass("miuix.device.DeviceUtils")
-            runCatching {
-                val method = cls.method("isFlipTinyScreen", android.content.Context::class.java)
-                hook(method, replaceResult(false))
-                log("DeviceIdentity: blocked DeviceUtils.isFlipTinyScreen")
-            }
-            runCatching {
-                val method = cls.method("isFlipDevice")
-                hook(method, replaceResult(false))
-                log("DeviceIdentity: blocked DeviceUtils.isFlipDevice")
-            }
-        }.onFailure { log("DeviceIdentity: DeviceUtils not found", it) }
-    }
-
-    // ── DeviceHelper.isTinyScreen / detectType (miuix.os) ─────────────────
-    private fun hookDeviceHelper(param: PackageReadyParam) {
-        runCatching {
-            val cls = param.classLoader.loadClass("miuix.os.DeviceHelper")
-            runCatching {
-                val method = cls.method("isTinyScreen", android.content.Context::class.java)
-                hook(method, replaceResult(false))
-                log("DeviceIdentity: blocked DeviceHelper.isTinyScreen")
-            }
-            runCatching {
-                val method = cls.method("detectType", android.content.Context::class.java)
-                hook(method, replaceResult(1)) // 1 = DEVICE_PHONE_TYPE
-                log("DeviceIdentity: forced DeviceHelper.detectType -> 1")
-            }
-        }.onFailure { log("DeviceIdentity: DeviceHelper not found", it) }
-    }
-
-    // ── MiuiConfigs: isFoldableDevice, isFlipTinyScreen, isTinyScreen,
-    //                    getAdjustedRotation ──────────────────────────────
-    private fun hookMiuiConfigs(param: PackageReadyParam) {
-        runCatching {
-            val cls = param.classLoader.loadClass("miui.util.MiuiConfigs")
-            runCatching {
-                val method = cls.method("isFoldableDevice")
-                hook(method, replaceResult(false))
-                log("DeviceIdentity: blocked MiuiConfigs.isFoldableDevice")
-            }
-            runCatching {
-                val method = cls.method("isFlipTinyScreen", android.content.Context::class.java)
-                hook(method, replaceResult(false))
-                log("DeviceIdentity: blocked MiuiConfigs.isFlipTinyScreen")
-            }
-            runCatching {
-                val method = cls.method("isTinyScreen", android.content.Context::class.java)
-                hook(method, replaceResult(false))
-                log("DeviceIdentity: blocked MiuiConfigs.isTinyScreen")
-            }
-            // getAdjustedRotation: removed. Rotation compensation is
-            // app-specific — some use system logic, others compute via
-            // CameraCharacteristics. One orientation always works.
-        }.onFailure { log("DeviceIdentity: MiuiConfigs not found", it) }
     }
 }
