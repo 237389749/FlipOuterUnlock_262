@@ -35,9 +35,6 @@ object CutoutHook : BaseHook() {
         hookCutoutParser(param.classLoader)
         hookPathAndDisplayCutoutFromSpec(param.classLoader)
         hookDisplayFlipFoldedCutout()
-        hookDisplayUtilsGetCutoutPosition(param)
-        // Display.getCutout + WindowInsets.getDisplayCutout: covered by GlobalCutoutHook (broader scope).
-        // computeSafeInsets: covered by Parser.parse→zero spec (definition layer root).
     }
 
     private fun hookCutoutParser(classLoader: ClassLoader) {
@@ -100,9 +97,6 @@ object CutoutHook : BaseHook() {
         }.onFailure { log("CutoutFix: failed hook pathAndDisplayCutoutFromSpec", it) }
     }
 
-    // Display.getCutout: covered by GlobalCutoutHook (all processes, NO_CUTOUT static field).
-    // WindowInsets.getDisplayCutout: covered by GlobalCutoutHook.
-
     // MIUI hidden method: Display.getFlipFoldedCutout()
     // Called reflectively by AlertController (miuix.jar) to get the
     // folded-state cutout. Separate from getCutout() — must be hooked
@@ -114,19 +108,4 @@ object CutoutHook : BaseHook() {
         }.onFailure { /* method may not exist on non-MIUI or older versions */ }
     }
 
-    private fun hookDisplayUtilsGetCutoutPosition(param: PackageReadyParam) {
-        if (param.packageName != "com.miui.aod") return
-        runCatching {
-            val displayUtilsClass = param.classLoader.loadClass("com.miui.aod.util.DisplayUtils")
-            val directionClass = param.classLoader.loadClass("com.miui.aod.widget.Direction")
-            val noneDirection = directionClass.getField("CAMERA_CUTOUT_ON_NONE").get(null)
-            val getCutoutPositionMethod = displayUtilsClass.method(
-                "getCutoutPosition", android.content.Context::class.java
-            )
-            hook(getCutoutPositionMethod, replaceResult(noneDirection))
-        }.onFailure { log("CutoutFix: failed hook DisplayUtils", it) }
-    }
-
-    // computeSafeInsets: covered by Parser.parse→zero spec.
-    // Display.getCutout + WindowInsets.getDisplayCutout: covered by GlobalCutoutHook.
 }

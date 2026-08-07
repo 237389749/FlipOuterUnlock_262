@@ -2,7 +2,6 @@ package com.example.flipunlock
 
 import com.example.flipunlock.hook.identity.DeviceIdentityHook
 import com.example.flipunlock.hook.cutout.CutoutHook
-import com.example.flipunlock.hook.cutout.GlobalCutoutHook
 import com.example.flipunlock.hook.util.log
 import com.example.flipunlock.hook.util.Config
 import io.github.libxposed.api.XposedModule
@@ -16,7 +15,6 @@ class Main : XposedModule() {
 
     private val hooks = listOf(
         DeviceIdentityHook,  // toast 居中 (ROOT: isFlipDevice → false)
-        // GlobalCutoutHook,    // [TEST DISABLED] cutout 去除
         CutoutHook,          // cutout 去除
     )
 
