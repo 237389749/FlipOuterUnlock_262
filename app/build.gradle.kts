@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.lsplugin.apksign)
 }
@@ -18,8 +18,8 @@ android {
         applicationId = "com.example.flipunlock"
         minSdk = 33
         targetSdk = 36
-        versionCode = 12
-        versionName = "2.7.2"
+        versionCode = 20
+        versionName = "2.8.0"
     }
 
     buildTypes {
