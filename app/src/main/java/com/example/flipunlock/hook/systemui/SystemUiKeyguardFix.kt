@@ -24,8 +24,11 @@ import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
  * the real view, regardless of isFlipDevice. This replicates the normal
  * flip-device path (and what common/flip2 SystemUI achieve via Dummy).
  *
- * Note: class name AbstractC4499x63c84e27 is an R8 name — will drift on
- * firmware upgrade; method name providesTinyKeyguardViewPager is stable.
+ * Note: target class real name is
+ * `ShadeViewProviderModule_Companion_ProvidesTinyKeyguardViewPagerFactory`
+ * (jadx renames it to AbstractC4499x63c84e27 — that alias does NOT exist in
+ * the dex). Method name providesTinyKeyguardViewPager is stable; the class
+ * name may still drift on firmware upgrade (fallback candidates kept).
  *
  * Process: com.android.systemui
  * Toggle: tied to DeviceIdentityHook (this fix exists only because
@@ -37,11 +40,18 @@ object SystemUiKeyguardFix : BaseHook() {
     override fun setupHooks(param: PackageReadyParam) {
         log("SystemUiKeyguardFix: loading for ${param.packageName}")
         safeHook("SystemUiKeyguardFix") {
-            val clsName = "com.android.systemui.shade.AbstractC4499x63c84e27"
-            val cls = runCatching {
-                param.classLoader.loadClass(clsName)
-            }.getOrElse {
-                log("SystemUiKeyguardFix: $clsName not found (R8 name drift?)")
+            // 真实类名（jadx renamed 注释还原）：ShadeViewProviderModule_Companion_...
+            // 注意：jadx 输出 AbstractC4499x63c84e27 是反混淆重命名，dex 里不存在！
+            // R8 名（AbstractC4499x63c84e27）仅供调试提示，保留在候选里兜底。
+            val candidates = listOf(
+                "com.android.systemui.shade.ShadeViewProviderModule_Companion_ProvidesTinyKeyguardViewPagerFactory",
+                "com.android.systemui.shade.AbstractC4499x63c84e27",
+            )
+            val cls = candidates.firstNotNullOfOrNull { name ->
+                runCatching { param.classLoader.loadClass(name) }.getOrNull()
+            }
+            if (cls == null) {
+                log("SystemUiKeyguardFix: provider class not found, tried $candidates (R8 drift?)")
                 return@safeHook
             }
             val shadeViewClass = param.classLoader.loadClass(
