@@ -3,6 +3,7 @@ package com.example.flipunlock.hook.identity
 import com.example.flipunlock.hook.BaseHook
 import com.example.flipunlock.hook.util.*
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
+import io.github.libxposed.api.XposedModuleInterface.SystemServerStartingParam
 
 /**
  * Hook MiuiMultiDisplayTypeInfo.isFlipDevice() → false.
@@ -87,6 +88,26 @@ object DeviceIdentityHook : BaseHook() {
             //     hook(method, replaceResult(false))
             //     log("DeviceIdentity: blocked MiuiMultiDisplayTypeInfo.isFoldDevice")
             // }
+        }
+    }
+
+    /**
+     * 属性层在 system_server 的注册（§34.7，按机型区分）：
+     * - flip2（bixi，zygisk_lsposed）：system_server 注入正常 → 属性 hook 生效 →
+     *   system_server 的 isFlipDevice→false → 服务端判定总闸（isFoldScreenDevice /
+     *   isDialogContinuityEnabled / 桌面路由）关闭——flip1 因注入断路（§41.2）做不到的
+     *   "服务端身份伪造"（§41.1）在 flip2 上可实现。
+     * - flip1（ruyi，corepatch 断路）：注入不到 system_server，hook 装不上（无害）。
+     */
+    fun hookSystemServer(param: SystemServerStartingParam) {
+        log("DeviceIdentityHook(system_server): gen=${DeviceGuard.gen}")
+        safeHook("DeviceIdentityHook-system_server") {
+            hookSystemProperties(param.classLoader)
+            runCatching {
+                val cls = param.classLoader.loadClass("miui.util.MiuiMultiDisplayTypeInfo")
+                hook(cls.method("isFlipDevice"), replaceResult(false))
+                log("DeviceIdentity(system_server): blocked MiuiMultiDisplayTypeInfo.isFlipDevice")
+            }.onFailure { log("DeviceIdentity(system_server): isFlipDevice hook failed", it) }
         }
     }
 

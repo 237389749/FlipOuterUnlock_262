@@ -48,7 +48,10 @@ class Main : XposedModule() {
     }
 
     override fun onSystemServerStarting(param: SystemServerStartingParam) {
-        log("Main: onSystemServerStarting — 属性层验证（除 DeviceIdentityHook 外全注释）")
+        log("Main: onSystemServerStarting — gen=${DeviceGuard.gen}")
+        // 属性层 system_server 注册（§34.7）：flip2 zygisk 注入正常 → 服务端身份伪造生效；
+        // flip1 corepatch 断路 → hook 装不上（无害）。
+        DeviceIdentityHook.hookSystemServer(param)
         // [DISABLED 2026-08-10 属性层验证] system_server hooks 全部待命：
         // AodHook.hookFramework(param)   // AOD 保活
         // AppWhitelist.hook(param)       // allowstart 白名单
