@@ -1,6 +1,7 @@
 package com.example.flipunlock
 
 import com.example.flipunlock.hook.identity.DeviceIdentityHook
+import com.example.flipunlock.hook.identity.CutoutAlwaysHook
 import com.example.flipunlock.hook.aod.AodHook
 import com.example.flipunlock.hook.cutout.CutoutHook
 import com.example.flipunlock.hook.system_server.AppRestriction
@@ -37,6 +38,8 @@ class Main : XposedModule() {
 
     private val hooks = listOf(
         DeviceIdentityHook,  // 属性层(SystemProperties.getInt→1) + isFlipDevice→false（双保险）
+        CutoutAlwaysHook,   // app 端 cutout 全屏：WindowLayoutStubImpl.getLayoutInDisplayCutoutMode→3
+                            // （§34.6 候选3，无需 system_server；flip2 cutout letterbox 客户端根治）
         // AodHook,          // [DISABLED 2026-08-10 属性层验证] 外屏 AOD
         // SystemUiKeyguardFix, // [DISABLED] systemui 已恢复排除（身份真实），失去前提
         // CutoutHook,       // [DISABLED] 排除法已验证不需要
