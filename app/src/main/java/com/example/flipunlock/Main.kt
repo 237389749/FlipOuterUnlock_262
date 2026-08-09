@@ -41,8 +41,10 @@ class Main : XposedModule() {
         DeviceIdentityHook,  // 属性层(SystemProperties.getInt→1) + isFlipDevice→false（双保险）
         CutoutAlwaysHook,   // app 端 cutout 全屏：WindowLayoutStubImpl.getLayoutInDisplayCutoutMode→3
                             // （§34.6 候选3，无需 system_server；flip2 cutout letterbox 客户端根治）
+        SystemUiKeyguardFix, // 重新启用 2026-08-10：KSU resetprop(multi_display_type=1) 后
+                             // SystemUI 也读属性 1 → providesTinyKeyguardViewPager 空视图 → NPE 崩溃环；
+                             // LSP 排除 systemui 挡不住属性源头，需此 fix 强制 inflate（§38.1/38.2）
         // AodHook,          // [DISABLED 2026-08-10 属性层验证] 外屏 AOD
-        // SystemUiKeyguardFix, // [DISABLED] systemui 已恢复排除（身份真实），失去前提
         // CutoutHook,       // [DISABLED] 排除法已验证不需要
     )
 
