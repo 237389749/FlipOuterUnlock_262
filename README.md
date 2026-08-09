@@ -211,6 +211,34 @@ For CI, add GitHub Secrets: `KEYSTORE` (base64), `KEYSTORE_PASSWORD`, `ALIAS`, `
 - `COUPLING_REVIEW.md` — full coupling/cohesion audit (2026-07-26)
 - `REFACTOR_PLAN.md` — consolidation plan with per-agent call-chain analysis
 
+## Current Status (2026-08-10) — for AI/developers onboarding
+
+**定位**：**flip1（ruyi）专用基版**，活跃开发。flip2 问题走 `FlipOuterUnlock2`（基线 90833c4）。
+
+### 当前活跃 hooks（master 最新）
+- **DeviceIdentityHook**（wildcard）：
+  - 属性层 `SystemProperties.getInt("persist.sys.multi_display_type")→1`（虚拟改属性，免 root）——flip1 上游大杀器
+  - `isFlipDevice→false`（双保险）
+  - 排除表：**systemui 恢复排除**（§38.4 控制中心/手势副作用）；fliphome/sogou 实验态
+- **CutoutAlwaysHook**（app 端四件套）：Parser.parse 清零 + Display.getCutout→空 + getBoundingRect→空 + getLayoutInDisplayCutoutMode→3
+- **system_server**：DeviceIdentityHook.hookSystemServer（flip1 corepatch 断路时装不上，无害）、Flip2CutoutLetterboxHook（仅 flip2 激活）、RotationFixHook（方向，依赖 system_server 注入）
+- 其余 hooks（AodHook/AppWhitelist/CompatConfigHook 等）按需 DISABLED 待命
+
+### 已验证（flip1）
+- isFlipDevice→false + 属性层：cutout 无 / toast 居中 / 控制中心正常（systemui 排除后）
+- systemui 排除（§38：TinyKeyguardPanel NPE 崩溃环教训）
+
+### 关键结论
+- flip1 上游 = `persist.sys.multi_display_type`（改 1 = 一改百效）
+- LSPosed 2.0.1 KSU 环境 system_server 注入异常（corepatch 变体 §41.2）
+- 详细分析见 `refMD/cleaned/FoldState_Device_Identity.md`（§1/§28/§38/§41）
+
+### 开发指引
+- 修改后：push → CI 编译 → 装机重启 → `adb shell su -c 'logcat -d | grep FlipOuterUnlock'` 验证
+- 新实验走单独分支；分析先查 refMD，再看 FlipRes
+
+---
+
 ### TODO
 
 - **miuihome gestures** (v2.9: hooks removed) — miuihome and fliphome use completely different gesture architectures. Hook-based attempts (Gates 1–8, LauncherHook) achieved partial results: side/back gestures work via edge overlay injection, bottom swipe-to-home works (returns to desktop), but bottom swipe-to-recents shows empty task list, and system haptic feedback on bottom gestures never fires. The recents animation pipeline (Shell/WindowTransition) is fundamentally broken on the flip outer screen — callbacks never arrive, timeouts produce no action. fliphome's native InputMonitor("swipe-up") was chosen as the primary gesture path instead. Full call-chain analysis preserved in refMD §6 and §13.
