@@ -4,6 +4,7 @@ import com.example.flipunlock.hook.identity.DeviceIdentityHook
 import com.example.flipunlock.hook.cutout.CutoutHook
 import com.example.flipunlock.hook.system_server.AppRestriction
 import com.example.flipunlock.hook.system_server.AppWhitelist
+import com.example.flipunlock.hook.system_server.CompatConfigHook
 import com.example.flipunlock.hook.system_server.DisplayTopologyHook
 import com.example.flipunlock.hook.system_server.LauncherRouteHook
 import com.example.flipunlock.hook.systemui.SystemUiKeyguardFix
@@ -49,10 +50,15 @@ class Main : XposedModule() {
     override fun onSystemServerStarting(param: SystemServerStartingParam) {
         log("Main: onSystemServerStarting — 262 base (system hooks staged)")
         // ── FU2 system_server hook 移植区（排除法逐个引入）──
-        // LauncherRouteHook.hook(param)      // [OFF] updateHomeIntent displayID==5 bypass（旧拓扑判据，新拓扑下需重审）
-        // AppRestriction.hook(param)         // [OFF] 外屏启动限制单门闸 → false
-        // AppWhitelist.hook(param)           // [OFF] allowstart 白名单全量注册（内存态）
-        // DisplayTopologyHook.hook(param)    // [OFF] 钉死 state=0，外屏恒为主屏
+        // 外屏 Activity 拦截解除（§38.5/§38.6 实机验证）：
+        //   WhitelistHook(allowstart) 命中 isInterceptListUnCheckFold 第1步短路 = 主通道
+        //   CompatConfigHook(属性→5) 兜底（第3步属性判定）
+        //   InterceptHook 两个方法一有害一冗余 → 不搬
+        CompatConfigHook.hook(param)   // 属性注入：miui.continuity.policy=5 + allow_small_cover_screen=1
+        AppWhitelist.hook(param)       // allowstart 全量白名单（解除外屏启动限制）
+        // AppRestriction.hook(param)      // [OFF] 外屏启动限制单门闸（被 AppWhitelist 覆盖）
+        // LauncherRouteHook.hook(param)   // [OFF] updateHomeIntent displayID==5 bypass（旧拓扑判据，新拓扑下需重审）
+        // DisplayTopologyHook.hook(param) // [OFF] 钉死 state=0（内屏已装回，前提消失）
     }
 
     override fun onPackageReady(param: PackageReadyParam) {
