@@ -10,6 +10,7 @@ import com.example.flipunlock.hook.system_server.CompatConfigHook
 import com.example.flipunlock.hook.system_server.DisplayTopologyHook
 import com.example.flipunlock.hook.system_server.Flip2CutoutLetterboxHook
 import com.example.flipunlock.hook.system_server.LauncherRouteHook
+import com.example.flipunlock.hook.system_server.RotationFixHook
 import com.example.flipunlock.hook.systemui.SystemUiKeyguardFix
 import com.example.flipunlock.hook.util.Config
 import com.example.flipunlock.hook.util.DeviceGuard
@@ -58,6 +59,8 @@ class Main : XposedModule() {
         DeviceIdentityHook.hookSystemServer(param)
         // flip2 专属：DISPLAY_CUTOUT letterbox 服务端开关（§34.6 候选1，仅 FLIP2 激活）
         Flip2CutoutLetterboxHook.hook(param)
+        // 方向修复：DisplayRotationStubImpl 折叠态旋转解锁（isFlipDevice→false 副作用）
+        RotationFixHook.hook(param)
         // [DISABLED 2026-08-10 属性层验证] system_server hooks 全部待命：
         // AodHook.hookFramework(param)   // AOD 保活
         // AppWhitelist.hook(param)       // allowstart 白名单
