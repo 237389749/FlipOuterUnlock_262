@@ -26,9 +26,8 @@ import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
  *   - sogou IME             : keyboard height on outer screen.
  * Each exclusion is togglable via persist.flipunlock.identity.exclude.*
  *
- * DISABLED (2026-08-10 排除法从头验证): 三个排除全部暂时注入
- * isFlipDevice→false，实测 systemui/fliphome/sogou 不排除的真实后果。
- * 验证完再决定恢复排除与否。
+ * 2026-08-10: systemui 排除恢复（用户决策）——SystemUI 内身份伪造副作用过大
+ * （§38.4：控制中心 4 项/手势），放弃 SystemUI 内伪造；fliphome/sogou 暂留实验。
  */
 object DeviceIdentityHook : BaseHook() {
     override val targetPackages = listOf("*")
@@ -39,18 +38,21 @@ object DeviceIdentityHook : BaseHook() {
 
     override fun hook(param: PackageReadyParam) {
         val pkg = param.packageName
-        // DISABLED (2026-08-10 排除法从头验证): 排除逻辑整体注释，
-        // systemui/fliphome/sogou 与其他作用域包一样注入 isFlipDevice→false。
-        // val excluded = when (pkg) {
-        //     "com.android.systemui" -> Config.identityExcludeSystemUi
-        //     "com.miui.fliphome" -> Config.identityExcludeFliphome
-        //     "com.sohu.inputmethod.sogou.xiaomi" -> Config.identityExcludeSogou
-        //     else -> false
-        // }
-        // if (excluded) {
-        //     log("DeviceIdentityHook: $pkg excluded (keeps real flip identity)")
-        //     return
-        // }
+        // DISABLED 说明：排除表恢复 systemui（2026-08-10 用户决策）——
+        // SystemUI 内身份伪造副作用过大（控制中心 4 项/手势问题，§38.4），
+        // 且 SystemUiKeyguardFix 已随排除恢复失去前提。miuihome 手势问题无法
+        // 通过 SystemUI 内定向 hook 解决 → 放弃 SystemUI 内身份伪造。
+        // fliphome/sogou 暂留实验（不排除），验证后决定。
+        val excluded = when (pkg) {
+            "com.android.systemui" -> Config.identityExcludeSystemUi
+            // "com.miui.fliphome" -> Config.identityExcludeFliphome        // [实验] 暂不排除
+            // "com.sohu.inputmethod.sogou.xiaomi" -> Config.identityExcludeSogou  // [实验] 暂不排除
+            else -> false
+        }
+        if (excluded) {
+            log("DeviceIdentityHook: $pkg excluded (keeps real flip identity)")
+            return
+        }
         // Master kill switch checked AFTER set-add: a process skipped while
         // disabled must still be hookable when the switch turns back on.
         if (!installedLoaders.add(param.classLoader)) return

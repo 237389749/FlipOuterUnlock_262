@@ -1,6 +1,7 @@
 package com.example.flipunlock
 
 import com.example.flipunlock.hook.identity.DeviceIdentityHook
+import com.example.flipunlock.hook.aod.AodHook
 import com.example.flipunlock.hook.cutout.CutoutHook
 import com.example.flipunlock.hook.system_server.AppRestriction
 import com.example.flipunlock.hook.system_server.AppWhitelist
@@ -35,9 +36,10 @@ class Main : XposedModule() {
 
     private val hooks = listOf(
         DeviceIdentityHook,  // toast 居中 + 外屏全屏 (ROOT: isFlipDevice → false)
-        SystemUiKeyguardFix, // 修 b5c1e89：isFlipDevice→false 作用于 SystemUI 时
-                             // providesTinyKeyguardViewPager 返回空视图 → ViewController NPE 崩溃环
-                             // （强制走 true 分支 inflate，refMD §38.1/§38.2）
+        AodHook,            // 外屏 AOD：aod 进程内 Utils.isFlipDevice→true 恢复 flip AOD 路径
+                            // + framework 保活（§25/§26）；systemui 恢复排除后 Layer0/1 仍有效
+        // SystemUiKeyguardFix, // [DISABLED] 2026-08-10 systemui 已恢复排除（身份真实），
+                              // providesTinyKeyguardViewPager 走原生 true 分支，此修复失去前提
         // CutoutHook,       // [DISABLED] 排除法已验证不需要
     )
 
@@ -56,6 +58,7 @@ class Main : XposedModule() {
         //   InterceptHook 两个方法一有害一冗余 → 不搬
         CompatConfigHook.hook(param)   // 属性注入：miui.continuity.policy=5 + allow_small_cover_screen=1
         AppWhitelist.hook(param)       // allowstart 全量白名单（解除外屏启动限制）
+        AodHook.hookFramework(param)   // AOD 保活：#1 updateRearDozeSettings + #2 stopDream 超时守卫
         // AppRestriction.hook(param)      // [OFF] 外屏启动限制单门闸（被 AppWhitelist 覆盖）
         // LauncherRouteHook.hook(param)   // [OFF] updateHomeIntent displayID==5 bypass（旧拓扑判据，新拓扑下需重审）
         // DisplayTopologyHook.hook(param) // [OFF] 钉死 state=0（内屏已装回，前提消失）
