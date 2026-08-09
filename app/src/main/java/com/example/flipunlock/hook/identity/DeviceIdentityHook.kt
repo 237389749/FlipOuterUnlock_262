@@ -25,6 +25,10 @@ import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
  *   - com.miui.fliphome     : outer launcher init needs real identity.
  *   - sogou IME             : keyboard height on outer screen.
  * Each exclusion is togglable via persist.flipunlock.identity.exclude.*
+ *
+ * DISABLED (2026-08-10 排除法从头验证): 三个排除全部暂时注入
+ * isFlipDevice→false，实测 systemui/fliphome/sogou 不排除的真实后果。
+ * 验证完再决定恢复排除与否。
  */
 object DeviceIdentityHook : BaseHook() {
     override val targetPackages = listOf("*")
@@ -35,18 +39,20 @@ object DeviceIdentityHook : BaseHook() {
 
     override fun hook(param: PackageReadyParam) {
         val pkg = param.packageName
+        // DISABLED (2026-08-10 排除法从头验证): 排除逻辑整体注释，
+        // systemui/fliphome/sogou 与其他作用域包一样注入 isFlipDevice→false。
+        // val excluded = when (pkg) {
+        //     "com.android.systemui" -> Config.identityExcludeSystemUi
+        //     "com.miui.fliphome" -> Config.identityExcludeFliphome
+        //     "com.sohu.inputmethod.sogou.xiaomi" -> Config.identityExcludeSogou
+        //     else -> false
+        // }
+        // if (excluded) {
+        //     log("DeviceIdentityHook: $pkg excluded (keeps real flip identity)")
+        //     return
+        // }
         // Master kill switch checked AFTER set-add: a process skipped while
         // disabled must still be hookable when the switch turns back on.
-        val excluded = when (pkg) {
-            "com.android.systemui" -> Config.identityExcludeSystemUi
-            "com.miui.fliphome" -> Config.identityExcludeFliphome
-            "com.sohu.inputmethod.sogou.xiaomi" -> Config.identityExcludeSogou
-            else -> false
-        }
-        if (excluded) {
-            log("DeviceIdentityHook: $pkg excluded (keeps real flip identity)")
-            return
-        }
         if (!installedLoaders.add(param.classLoader)) return
         if (!Config.enabled) {
             log("DeviceIdentityHook: master switch off, skipped for $pkg")
