@@ -6,6 +6,7 @@ import com.example.flipunlock.hook.system_server.AppRestriction
 import com.example.flipunlock.hook.system_server.AppWhitelist
 import com.example.flipunlock.hook.system_server.DisplayTopologyHook
 import com.example.flipunlock.hook.system_server.LauncherRouteHook
+import com.example.flipunlock.hook.systemui.SystemUiKeyguardFix
 import com.example.flipunlock.hook.util.Config
 import com.example.flipunlock.hook.util.DeviceGuard
 import com.example.flipunlock.hook.util.log
@@ -33,6 +34,9 @@ class Main : XposedModule() {
 
     private val hooks = listOf(
         DeviceIdentityHook,  // toast 居中 + 外屏全屏 (ROOT: isFlipDevice → false)
+        SystemUiKeyguardFix, // 修 b5c1e89：isFlipDevice→false 作用于 SystemUI 时
+                             // providesTinyKeyguardViewPager 返回空视图 → ViewController NPE 崩溃环
+                             // （强制走 true 分支 inflate，refMD §38.1/§38.2）
         // CutoutHook,       // [DISABLED] 排除法已验证不需要
     )
 
