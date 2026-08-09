@@ -35,11 +35,9 @@ internal var module: Main? = null
 class Main : XposedModule() {
 
     private val hooks = listOf(
-        DeviceIdentityHook,  // toast 居中 + 外屏全屏 (ROOT: isFlipDevice → false)
-        AodHook,            // 外屏 AOD：aod 进程内 Utils.isFlipDevice→true 恢复 flip AOD 路径
-                            // + framework 保活（§25/§26）；systemui 恢复排除后 Layer0/1 仍有效
-        // SystemUiKeyguardFix, // [DISABLED] 2026-08-10 systemui 已恢复排除（身份真实），
-                              // providesTinyKeyguardViewPager 走原生 true 分支，此修复失去前提
+        DeviceIdentityHook,  // 属性层(SystemProperties.getInt→1) + isFlipDevice→false（双保险）
+        // AodHook,          // [DISABLED 2026-08-10 属性层验证] 外屏 AOD
+        // SystemUiKeyguardFix, // [DISABLED] systemui 已恢复排除（身份真实），失去前提
         // CutoutHook,       // [DISABLED] 排除法已验证不需要
     )
 
@@ -50,18 +48,14 @@ class Main : XposedModule() {
     }
 
     override fun onSystemServerStarting(param: SystemServerStartingParam) {
-        log("Main: onSystemServerStarting — 262 base (system hooks staged)")
-        // ── FU2 system_server hook 移植区（排除法逐个引入）──
-        // 外屏 Activity 拦截解除（§38.5/§38.6 实机验证）：
-        //   WhitelistHook(allowstart) 命中 isInterceptListUnCheckFold 第1步短路 = 主通道
-        //   CompatConfigHook(属性→5) 兜底（第3步属性判定）
-        //   InterceptHook 两个方法一有害一冗余 → 不搬
-        CompatConfigHook.hook(param)   // 属性注入：miui.continuity.policy=5 + allow_small_cover_screen=1
-        AppWhitelist.hook(param)       // allowstart 全量白名单（解除外屏启动限制）
-        AodHook.hookFramework(param)   // AOD 保活：#1 updateRearDozeSettings + #2 stopDream 超时守卫
-        // AppRestriction.hook(param)      // [OFF] 外屏启动限制单门闸（被 AppWhitelist 覆盖）
-        // LauncherRouteHook.hook(param)   // [OFF] updateHomeIntent displayID==5 bypass（旧拓扑判据，新拓扑下需重审）
-        // DisplayTopologyHook.hook(param) // [OFF] 钉死 state=0（内屏已装回，前提消失）
+        log("Main: onSystemServerStarting — 属性层验证（除 DeviceIdentityHook 外全注释）")
+        // [DISABLED 2026-08-10 属性层验证] system_server hooks 全部待命：
+        // AodHook.hookFramework(param)   // AOD 保活
+        // AppWhitelist.hook(param)       // allowstart 白名单
+        // CompatConfigHook.hook(param)   // continuity 属性注入
+        // AppRestriction.hook(param)
+        // LauncherRouteHook.hook(param)
+        // DisplayTopologyHook.hook(param)
     }
 
     override fun onPackageReady(param: PackageReadyParam) {

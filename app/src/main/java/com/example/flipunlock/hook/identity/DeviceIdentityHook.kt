@@ -28,6 +28,13 @@ import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
  *
  * 2026-08-10: systemui 排除恢复（用户决策）——SystemUI 内身份伪造副作用过大
  * （§38.4：控制中心 4 项/手势），放弃 SystemUI 内伪造；fliphome/sogou 暂留实验。
+ *
+ * 2026-08-10 属性层升级（§38.9）：在 isFlipDevice→false 基础上，hook
+ *   SystemProperties.getInt("persist.sys.multi_display_type") → 1（虚拟改属性，
+ *   免 root，按进程生效）。覆盖所有运行时读属性的代码。
+ *   注意：静态常量（miuix.os.Build.IS_FLIP / DeviceFeature.IS_FOLD_DEVICE /
+ *   DefaultTransitionImpl.IS_FLIP_DEVICE）在 zygote 类加载时已固化，hook 覆盖不了
+ *   ——需 resetprop（root, post-fs-data）才能在 fork 前生效（TODO）。
  */
 object DeviceIdentityHook : BaseHook() {
     override val targetPackages = listOf("*")
@@ -67,6 +74,7 @@ object DeviceIdentityHook : BaseHook() {
     override fun setupHooks(param: PackageReadyParam) {
         log("DeviceIdentityHook: loading for ${param.packageName}")
         safeHook("DeviceIdentityHook") {
+            hookSystemProperties(param.classLoader)
             val cls = param.classLoader.loadClass("miui.util.MiuiMultiDisplayTypeInfo")
             runCatching {
                 val method = cls.method("isFlipDevice")
@@ -80,5 +88,31 @@ object DeviceIdentityHook : BaseHook() {
             //     log("DeviceIdentity: blocked MiuiMultiDisplayTypeInfo.isFoldDevice")
             // }
         }
+    }
+
+    /**
+     * 属性层（§38.9）：hook persist.sys.multi_display_type 读取 → 1。
+     * 覆盖所有运行时读属性的代码（isFlipDevice/isFoldDevice/DeviceUtils/IS_FLIP 常量
+     * 初始化等）。hook android.os.SystemProperties（AOSP 最终实现）+ miuix 包装
+     * （MixFlipMod 同款），双路径保险。
+     *
+     * 限制：静态常量在 zygote 类加载时固化，本 hook 对已加载类无效；
+     * 全效果需 resetprop（root）在 fork 前改属性。
+     */
+    private fun hookSystemProperties(classLoader: ClassLoader) {
+        runCatching {
+            val sp = classLoader.loadClass("android.os.SystemProperties")
+            hook(sp.method("getInt", String::class.java, Int::class.java)) { chain ->
+                if (chain.args[0] == "persist.sys.multi_display_type") 1 else chain.proceed()
+            }
+            log("DeviceIdentity: hooked android SystemProperties.getInt (multi_display_type→1)")
+        }.onFailure { log("DeviceIdentity: android SystemProperties hook failed", it) }
+        runCatching {
+            val sp = classLoader.loadClass("miuix.core.util.SystemProperties")
+            hook(sp.method("getInt", String::class.java, Int::class.java)) { chain ->
+                if (chain.args[0] == "persist.sys.multi_display_type") 1 else chain.proceed()
+            }
+            log("DeviceIdentity: hooked miuix SystemProperties.getInt")
+        }.onFailure { log("DeviceIdentity: miuix SystemProperties hook failed", it) }
     }
 }
