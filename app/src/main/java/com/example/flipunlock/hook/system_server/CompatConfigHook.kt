@@ -2,6 +2,7 @@ package com.example.flipunlock.hook.system_server
 
 import android.content.ComponentName
 import com.example.flipunlock.hook.util.*
+import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModuleInterface.SystemServerStartingParam
 
 /**
