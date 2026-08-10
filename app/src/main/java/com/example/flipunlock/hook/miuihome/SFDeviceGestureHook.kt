@@ -28,9 +28,19 @@ import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
  * registers the swipe-up listener, and also adds the back stub window
  * (side back gesture) — i.e. the outer screen behaves like a normal phone.
  *
- * Side effects (accepted): UnlockAnimationStateMachine:229 and
- * DeviceConfigs:266/268 see folded=false; both are flip-F special-case
- * branches that are exactly what we want to disable.
+ * Second gate (2026-08-10 real-device finding): NavStubView is only created
+ * when mIsFsgNavBar=true, i.e. Settings.Global "force_fsg_nav_bar" ("隐藏屏幕
+ * 按键") is 1 — it defaults to 0, so even with the folded gate removed the
+ * swipe-up executor is never created. Fix: hook
+ * MiuiSettingsUtils.getGlobalBoolean → true for "force_fsg_nav_bar" (module-
+ * scoped to com.miui.home only; does NOT touch the global setting, so
+ * SystemUI / inner screen / other processes are unaffected, and uninstalling
+ * the module restores the original behavior).
+ *
+ * Side effects (accepted): onFold callback (BaseRecentsImpl:442-449) still
+ * removes NavStubView on a fold toggle — acceptable while the device stays
+ * folded; other force_fsg_nav_bar consumers in miuihome (GestureLineUtils /
+ * DeviceConfigs / StatusBarUtils) all see "fullscreen gesture" consistently.
  *
  * Process: com.miui.home
  * Class/method names are NOT obfuscated in b5c1e89 (classes2.dex).
@@ -50,6 +60,23 @@ object SFDeviceGestureHook : BaseHook() {
                 false
             }
             log("SFDeviceGestureHook: ✓ isInSFDeviceFoldedMode → false (swipe-up restored on outer screen)")
+
+            // 执行器开关：NavStubView 创建条件 mIsFsgNavBar=Settings.Global force_fsg_nav_bar（默认 0）
+            // → hook MiuiSettingsUtils.getGlobalBoolean("force_fsg_nav_bar")→true（只影响 miuihome 进程）
+            val settingsCls = param.classLoader.findClassUp(
+                "com.miui.launcher.utils.MiuiSettingsUtils")
+                ?: run {
+                    log("SFDeviceGestureHook: MiuiSettingsUtils not found")
+                    return@safeHook
+                }
+            val getGlobalBoolean = settingsCls.method(
+                "getGlobalBoolean",
+                android.content.ContentResolver::class.java,
+                String::class.java)
+            hook(getGlobalBoolean) { chain ->
+                if (chain.args[1] == "force_fsg_nav_bar") true else chain.proceed()
+            }
+            log("SFDeviceGestureHook: ✓ force_fsg_nav_bar → true (NavStubView executor enabled)")
         }
     }
 }
