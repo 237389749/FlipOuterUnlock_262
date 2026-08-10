@@ -2,6 +2,7 @@ package com.example.flipunlock
 
 import com.example.flipunlock.hook.identity.DeviceIdentityHook
 import com.example.flipunlock.hook.identity.CutoutAlwaysHook
+import com.example.flipunlock.hook.miuihome.SFDeviceGestureHook
 import com.example.flipunlock.hook.aod.AodHook
 import com.example.flipunlock.hook.cutout.CutoutHook
 import com.example.flipunlock.hook.system_server.AppRestriction
@@ -41,6 +42,9 @@ class Main : XposedModule() {
         DeviceIdentityHook,  // 属性层(SystemProperties.getInt→1) + isFlipDevice→false（双保险）
         CutoutAlwaysHook,   // app 端 cutout 全屏：WindowLayoutStubImpl.getLayoutInDisplayCutoutMode→3
                             // （§34.6 候选3，无需 system_server；flip2 cutout letterbox 客户端根治）
+        SFDeviceGestureHook, // 外屏上滑手势：属性层覆盖不到 isSpecialFDevice(MD5 指纹)，
+                             // miuihome 折叠态短路 NavStubView → 上滑无反应；hook folded→false
+                             // 让 miuihome 折叠态也建手势条/上滑监听（含侧边返回条）
         SystemUiKeyguardFix, // 重新启用 2026-08-10：KSU resetprop(multi_display_type=1) 后
                              // SystemUI 也读属性 1 → providesTinyKeyguardViewPager 空视图 → NPE 崩溃环；
                              // LSP 排除 systemui 挡不住属性源头，需此 fix 强制 inflate（§38.1/38.2）
